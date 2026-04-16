@@ -2,6 +2,8 @@ import { auth } from "@/auth";
 import AdminDashboardClient from "@/components/admin/AdminDashboardClient";
 import { FORCE_PREMIUM } from "@/lib/constants/admin";
 import { UserRole } from "@/lib/rbac/roles";
+import { MdDashboard } from "react-icons/md";
+import { FiLock } from "react-icons/fi";
 
 export default async function AdminDashboardPage() {
   const session = await auth();
