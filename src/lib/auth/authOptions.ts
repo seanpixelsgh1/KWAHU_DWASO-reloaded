@@ -14,8 +14,14 @@ import {
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { UserRole } from "@/lib/rbac/roles";
+import { FORCE_PREMIUM } from "@/lib/constants/admin";
+import { formatDisplayName } from "@/lib/utils/user";
+
+const ADMIN_EMAIL = "seanpixelsgh1@gmail.com";
+const isDev = process.env.NODE_ENV === "development";
 
 export const authConfig: NextAuthConfig = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -147,8 +153,21 @@ export const authConfig: NextAuthConfig = {
         token.id = user.id || token.sub || `user_${Date.now()}`;
         token.role = "user"; // Default role for OAuth users
         token.email = user.email;
+        
+        // HEARTBEAT: Ensure name is never empty in the token
+        token.name = user.name || user.email?.split("@")[0] || "User";
+
         if (user.image) {
           token.picture = user.image;
+        }
+
+        // God Mode: Elevate trusted users or local dev sessions
+        if (
+          user.email?.toLowerCase() === ADMIN_EMAIL ||
+          (FORCE_PREMIUM && isDev)
+        ) {
+          token.role = "admin";
+          token.isPremium = true;
         }
       }
 
@@ -172,6 +191,9 @@ export const authConfig: NextAuthConfig = {
       if (token && session.user) {
         session.user.id = (token.id as string) || (token.sub as string);
         session.user.email = token.email as string;
+        
+        // Prioritize token name (already hardened in jwt callback)
+        session.user.name = (token.name as string) || session.user.name;
 
         // Fetch the latest user data from Firestore to get the correct role
         try {
@@ -179,7 +201,14 @@ export const authConfig: NextAuthConfig = {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             session.user.role = (userData.role as UserRole) || "user";
-            session.user.name = userData.name || session.user.name;
+            
+            // Hardened fallback: prioritize firestore name, then session name, then email prefix
+            session.user.name = formatDisplayName(
+              userData.name,
+              session.user.name || session.user.email?.split("@")[0] || "User",
+              userData.profile
+            );
+
             session.user.image = userData.image || (token.picture as string);
           } else {
             session.user.role = (token.role as UserRole) || "user";
@@ -187,6 +216,15 @@ export const authConfig: NextAuthConfig = {
         } catch (error) {
           console.error("Error fetching user data from Firestore:", error);
           session.user.role = (token.role as UserRole) || "user";
+        }
+
+        // God Mode Override (Session Level)
+        if (
+          session.user.email?.toLowerCase() === ADMIN_EMAIL ||
+          (FORCE_PREMIUM && isDev)
+        ) {
+          session.user.role = "admin";
+          (session.user as any).isPremium = true;
         }
 
         // Ensure image is properly passed through if not from Firestore

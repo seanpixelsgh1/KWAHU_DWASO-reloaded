@@ -15,7 +15,7 @@ const initialState: InitialState = {
 };
 
 export const shofySlice = createSlice({
-  name: "shofy",
+  name: "kwahudwaso",
   initialState,
   reducers: {
     addToCart: (state, action) => {

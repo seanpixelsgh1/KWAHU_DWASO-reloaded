@@ -20,6 +20,7 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import PriceFormat from "@/components/PriceFormat";
+import { formatDisplayName } from "@/lib/utils/user";
 
 interface Order {
   id: string;
@@ -71,7 +72,9 @@ export default function PackerDashboard() {
         (order) =>
           order.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
           order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          formatDisplayName(order.customerName, "")
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
           order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -336,7 +339,7 @@ export default function PackerDashboard() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {order.customerName || "No Name"}
+                          {formatDisplayName(order.customerName, "Guest")}
                         </div>
                         <div className="text-sm text-gray-500">
                           {order.customerEmail}

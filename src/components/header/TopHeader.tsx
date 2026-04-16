@@ -29,8 +29,7 @@ const TopHeader = ({
           className="w-full md:w-auto text-sm flex items-center justify-center md:justify-normal font-medium py-1 cursor-pointer hover:text-orange-300 transition-colors duration-200"
           onClick={openShippingModal}
         >
-          <CiDeliveryTruck className="text-[#ffb342] text-2xl mr-1" /> FREE
-          Express Shipping On Orders ${freeShippingThreshold}+
+          <CiDeliveryTruck className="text-[#ffb342] text-2xl mr-1" /> Reliable delivery across Nkawkaw, Mpraeso, and the entire Kwahu enclave
         </p>
         <div className="hidden md:inline-flex items-center text-sm text-white gap-1">
           <LanguageDropdown />

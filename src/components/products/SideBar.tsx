@@ -15,7 +15,7 @@ interface Props {
 
 const SideBar = ({ product }: Props) => {
   const dispatch = useDispatch();
-  const { favorite } = useSelector((state: StateType) => state?.shopy);
+  const { favorite } = useSelector((state: StateType) => state?.kwahudwaso);
   const [existingProduct, setExistingProduct] = useState<ProductType | null>(
     null
   );

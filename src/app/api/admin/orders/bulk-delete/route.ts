@@ -1,18 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hasPermission } from "@/lib/rbac/roles";
-import { db } from "@/lib/firebase/config";
-import {
-  collection,
-  getDocs,
-  doc,
-  deleteDoc,
-  writeBatch,
-} from "firebase/firestore";
+import { adminDb as db } from "@/lib/firebase/admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export async function DELETE(request: NextRequest) {
   try {
-    // TODO: Add proper authentication and permission checks
-
     const { orderIds } = await request.json();
 
     if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
@@ -22,31 +13,31 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Use batch delete for better performance
-    const batch = writeBatch(db);
+    // Use batch delete for better performance using Admin SDK
+    const batch = db.batch();
 
     // Delete orders from the orders collection
     for (const orderId of orderIds) {
-      const orderRef = doc(db, "orders", orderId);
+      const orderRef = db.collection("orders").doc(orderId);
       batch.delete(orderRef);
     }
 
-    // Also need to remove these orders from user documents
-    // First find all users who might have these orders
-    const usersRef = collection(db, "users");
-    const usersSnapshot = await getDocs(usersRef);
+    // Also need to remove these orders from user documents using Admin SDK
+    const usersSnapshot = await db.collection("users").get();
 
-    usersSnapshot.docs.forEach((userDoc) => {
-      const userData = userDoc.data();
-      if (userData.orders && Array.isArray(userData.orders)) {
+    usersSnapshot.docs.forEach((userDocSnapshot) => {
+      const userData = userDocSnapshot.exists ? userDocSnapshot.data() : null;
+      if (userData?.orders && Array.isArray(userData.orders)) {
         const filteredOrders = userData.orders.filter(
           (order: any) => !orderIds.includes(order.id)
         );
 
         if (filteredOrders.length !== userData.orders.length) {
           // This user had some of the deleted orders
-          const userRef = doc(db, "users", userDoc.id);
-          batch.update(userRef, { orders: filteredOrders });
+          batch.update(userDocSnapshot.ref, { 
+            orders: filteredOrders,
+            updatedAt: FieldValue.serverTimestamp()
+          });
         }
       }
     });
@@ -59,10 +50,11 @@ export async function DELETE(request: NextRequest) {
       deletedCount: orderIds.length,
     });
   } catch (error) {
-    console.error("Error bulk deleting orders:", error);
+    console.error("API ERROR [admin-orders-bulk-delete]:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
     );
   }
 }
+

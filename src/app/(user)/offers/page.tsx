@@ -6,7 +6,7 @@ import OffersList from "@/components/pages/offers/OffersList";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Special Offers - Shofy",
+  title: "Special Offers - Kwahu Dwaso",
   description:
     "Discover amazing deals and special offers on our best products. Save big on electronics, fashion, beauty, and more!",
 };

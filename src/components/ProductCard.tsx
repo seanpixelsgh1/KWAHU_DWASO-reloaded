@@ -18,7 +18,7 @@ interface Props {
 const ProductCard = ({ product }: Props) => {
   const dispatch = useDispatch();
   const { data: session } = useSession();
-  const { favorite } = useSelector((state: StateType) => state?.shopy);
+  const { favorite } = useSelector((state: StateType) => state?.kwahudwaso);
   const [isFavorite, setIsFavorite] = useState(false);
 
   const regularPrice = product?.price;

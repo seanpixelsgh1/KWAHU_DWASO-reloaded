@@ -2,7 +2,7 @@ import Container from "../Container";
 import { LiaUser } from "react-icons/lia";
 import Link from "next/link";
 import SearchInput from "./SearchInput";
-import { auth } from "../../../auth";
+import { auth } from "@/auth";
 import MobileNavigation from "./MobileNavigation";
 import HeaderIcons from "./HeaderIcons";
 import Logo from "../Logo";

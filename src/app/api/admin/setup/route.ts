@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 // This is a development utility endpoint to set admin role
 // In production, this should be secured or done through Firebase Admin Console
@@ -16,10 +17,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
 
-    // Update user role to admin
+    // Update user role to admin using Admin SDK
     await adminDb.collection("users").doc(email).update({
       role: "admin",
-      updatedAt: new Date().toISOString(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
 
     return NextResponse.json({
@@ -27,10 +28,11 @@ export async function POST(request: NextRequest) {
       success: true,
     });
   } catch (error) {
-    console.error("Error setting admin role:", error);
+    console.error("API ERROR [admin-setup]:", error);
     return NextResponse.json(
       { error: "Failed to set admin role" },
       { status: 500 }
     );
   }
 }
+

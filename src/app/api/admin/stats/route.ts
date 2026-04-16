@@ -1,27 +1,33 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { adminDb as db } from "@/lib/firebase/admin";
 
 export async function GET() {
   try {
-    // Fetch real data from Firebase
+    // Fetch real data from Firebase using Admin SDK
     const [usersSnapshot, ordersSnapshot] = await Promise.all([
-      getDocs(collection(db, "users")),
-      getDocs(collection(db, "orders")),
+      db.collection("users").get(),
+      db.collection("orders").get(),
     ]);
 
-    const users = usersSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    const orders = ordersSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as any[];
+    const users = usersSnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+      };
+    });
+    
+    const orders = ordersSnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+      };
+    }) as any[];
 
     // Calculate real stats
     const totalRevenue = orders.reduce(
-      (sum, order) => sum + (order.total || 0),
+      (sum, order) => sum + (Number(order.total) || 0),
       0
     );
     const pendingOrders = orders.filter(
@@ -42,10 +48,11 @@ export async function GET() {
 
     return NextResponse.json(stats);
   } catch (error) {
-    console.error("Error fetching admin stats:", error);
+    console.error("API ERROR [admin-stats-get]:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
     );
   }
 }
+

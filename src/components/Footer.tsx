@@ -16,11 +16,16 @@ const Footer = () => {
       <Container className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <div className="flex flex-col items-start gap-y-5">
           <Link href={"/"}>
-            <Image src={logo} alt="logo" width={112} height={40} />
+            <Image 
+              src="/kwahudwaso-logo.png" 
+              alt="Kwahu Dwaso Logo" 
+              width={180} 
+              height={40} 
+              className="h-10 w-auto object-contain"
+            />
           </Link>
           <p>
-            We are a team of designers and developers that create high quality
-            WordPress
+            Kwahu Dwaso is the premier digital marketplace dedicated to serving Nkawkaw and the entire Kwahu enclave with quality products and reliable delivery.
           </p>
           <SocialLink />
         </div>
@@ -59,14 +64,14 @@ const Footer = () => {
           <div className="mt-3">
             <div>
               <p className="text-sm">Got Questions? Call us</p>
-              <Title>+670 413 90 762</Title>
+              <Title>(+233 557704585)</Title>
             </div>
             <div className="mt-3">
               <p className="text-base flex items-center gap-x-3 text-gray-600">
-                <BsEnvelopeAt /> shofy@suppert.com
+                <BsEnvelopeAt /> info@kwahudwaso.com
               </p>
               <p className="text-base flex items-center gap-x-3 text-gray-600">
-                <GrLocation /> Dhaka, Bangladesh
+                <GrLocation /> Nkawkaw, Eastern Region, Ghana
               </p>
             </div>
           </div>

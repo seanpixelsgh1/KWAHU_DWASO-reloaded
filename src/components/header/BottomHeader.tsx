@@ -1,7 +1,7 @@
 import Container from "../Container";
 import Link from "next/link";
 import { navigation } from "@/constants";
-import { auth } from "../../../auth";
+import { auth } from "@/auth";
 import SignOutButton from "./SignOutButton";
 
 const BottomHeader = async () => {
@@ -19,7 +19,7 @@ const BottomHeader = async () => {
           <SignOutButton session={session} />
         </div>
         <p className="text-xs text-gray-400 font-medium hidden md:inline-flex">
-          Hotline: <span className="text-black">+88 01012345678</span>
+          Hotline: <span className="text-black">(+233 557704585)</span>
         </p>
       </Container>
     </div>

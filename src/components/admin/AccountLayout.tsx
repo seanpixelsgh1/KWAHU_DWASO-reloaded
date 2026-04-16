@@ -25,7 +25,7 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
 
   // Check if user is admin
   const isAdmin =
-    session?.user?.email === "admin@shofy.com" ||
+    session?.user?.email === "admin@kwahudwaso.com" ||
     (session?.user as any)?.role === "admin";
 
   const regularTabs: TabItem[] = [

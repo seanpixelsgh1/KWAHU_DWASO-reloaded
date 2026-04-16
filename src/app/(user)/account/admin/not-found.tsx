@@ -28,10 +28,7 @@ export default function AdminNotFound() {
       <div className="space-y-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
           <p className="text-lg text-gray-700 mb-4">
-            🚫 This admin page is only available in the{" "}
-            <span className="font-semibold text-theme-color">
-              Premium Version
-            </span>
+            🚫 This admin page is currently restricted or being updated.
           </p>
           <p className="text-gray-600 mb-6">
             The page you&apos;re trying to access has been restricted to premium
@@ -65,7 +62,7 @@ export default function AdminNotFound() {
         </div>
 
         {/* Action Section */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+        <div className="flex justify-center items-center">
           <Link href="/account/admin">
             <Button
               variant="outline"
@@ -76,19 +73,10 @@ export default function AdminNotFound() {
               Back to Admin Dashboard
             </Button>
           </Link>
-
-          <Button
-            href="https://buymeacoffee.com/reactbd/e/448682"
-            size="lg"
-            className="inline-flex items-center bg-gradient-to-r from-theme-color to-theme-color/80 hover:from-theme-color/90 hover:to-theme-color text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
-          >
-            🎯 Upgrade to Premium
-            <FiExternalLink className="ml-2 h-4 w-4" />
-          </Button>
         </div>
 
         <p className="text-sm text-gray-500 text-center mt-4">
-          Unlock all premium features with a one-time purchase!
+          Kwahu Dwaso Administration
         </p>
       </div>
     </div>

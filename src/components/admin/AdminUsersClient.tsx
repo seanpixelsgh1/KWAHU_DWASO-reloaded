@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { AdminTableSkeleton } from "./AdminSkeletons";
 import { USER_ROLES } from "@/lib/rbac/permissions";
 import { toast } from "react-hot-toast";
+import { formatDisplayName } from "@/lib/utils/user";
 import {
   FiEdit2,
   FiTrash2,
@@ -351,10 +352,10 @@ export default function AdminUsersClient() {
                 <td className="px-4 sm:px-6 py-4">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10">
-                      {user.name ? (
+                      {formatDisplayName(user.name, "", (user as any).profile) ? (
                         <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-indigo-100 flex items-center justify-center">
                           <span className="text-xs sm:text-sm font-medium text-indigo-800">
-                            {user.name.charAt(0).toUpperCase()}
+                            {formatDisplayName(user.name, "U", (user as any).profile).charAt(0).toUpperCase()}
                           </span>
                         </div>
                       ) : (
@@ -363,7 +364,7 @@ export default function AdminUsersClient() {
                     </div>
                     <div className="ml-3 sm:ml-4 min-w-0 flex-1">
                       <div className="text-sm font-medium text-gray-900 truncate">
-                        {user.name || "No Name"}
+                        {formatDisplayName(user.name, "Unnamed User", (user as any).profile)}
                       </div>
                       <div className="text-xs sm:text-sm text-gray-500 flex items-center truncate">
                         <FiMail className="h-3 w-3 mr-1 flex-shrink-0" />
@@ -381,7 +382,7 @@ export default function AdminUsersClient() {
                       </div>
                       {/* Mobile stats */}
                       <div className="md:hidden mt-1 text-xs text-gray-500">
-                        {user.orders || 0} orders • $
+                        {user.orders || 0} orders • GH₵
                         {(user.totalSpent || 0).toFixed(2)}
                       </div>
                     </div>
@@ -402,7 +403,7 @@ export default function AdminUsersClient() {
                   {user.orders || 0} orders
                 </td>
                 <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  ${(user.totalSpent || 0).toFixed(2)}
+                  GH₵{(user.totalSpent || 0).toFixed(2)}
                 </td>
                 <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <div className="flex items-center">
@@ -531,11 +532,7 @@ export default function AdminUsersClient() {
               <div className="flex flex-col items-center">
                 <div className="h-20 w-20 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center shadow-lg">
                   <span className="text-2xl font-bold text-white">
-                    {editForm.name
-                      ? editForm.name.charAt(0).toUpperCase()
-                      : editingUser.name
-                      ? editingUser.name.charAt(0).toUpperCase()
-                      : "U"}
+                    {formatDisplayName(editForm.name || editingUser?.name, "U").charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
@@ -667,7 +664,7 @@ export default function AdminUsersClient() {
                       Total Spent
                     </p>
                     <p className="text-xl font-bold text-green-600">
-                      ${(editingUser.totalSpent || 0).toFixed(2)}
+                      GH₵{(editingUser.totalSpent || 0).toFixed(2)}
                     </p>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg border border-green-100">
@@ -764,26 +761,22 @@ export default function AdminUsersClient() {
               <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
                 <div className="flex items-center">
                   <div className="flex-shrink-0 h-10 w-10">
-                    {userToDelete.name ? (
-                      <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-                        <span className="text-sm font-medium text-red-800">
-                          {userToDelete.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    ) : (
-                      <FiUser className="h-10 w-10 text-red-400" />
-                    )}
+                    <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                      <span className="text-sm font-medium text-red-800">
+                        {formatDisplayName(userToDelete.name, "U", (userToDelete as any).profile).charAt(0).toUpperCase()}
+                      </span>
+                    </div>
                   </div>
                   <div className="ml-4">
                     <div className="text-sm font-medium text-red-900">
-                      {userToDelete.name || "No Name"}
+                      {formatDisplayName(userToDelete.name, "Unnamed User", (userToDelete as any).profile)}
                     </div>
                     <div className="text-sm text-red-700">
                       {userToDelete.email}
                     </div>
                     <div className="text-xs text-red-600 mt-1">
                       Role: {getRoleDisplayName(userToDelete.role)} •
-                      {userToDelete.orders || 0} orders • $
+                      {userToDelete.orders || 0} orders • GH₵
                       {(userToDelete.totalSpent || 0).toFixed(2)} spent
                     </div>
                   </div>
@@ -871,19 +864,18 @@ export default function AdminUsersClient() {
                         className="flex items-center mb-2 last:mb-0"
                       >
                         <div className="flex-shrink-0 h-6 w-6">
-                          {user.name ? (
-                            <div className="h-6 w-6 rounded-full bg-red-100 flex items-center justify-center">
-                              <span className="text-xs font-medium text-red-800">
-                                {user.name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          ) : (
-                            <FiUser className="h-6 w-6 text-red-400" />
-                          )}
+                          <div className="h-6 w-6 rounded-full bg-red-100 flex items-center justify-center">
+                            <span className="text-xs font-medium text-red-800">
+                              {formatDisplayName(user.name, "U")
+                                .charAt(0)
+                                .toUpperCase()}
+                            </span>
+                          </div>
                         </div>
                         <div className="ml-2">
                           <span className="text-xs text-red-800">
-                            {user.name || "No Name"} ({user.email})
+                            {formatDisplayName(user.name, "Unnamed User")} (
+                            {user.email})
                           </span>
                         </div>
                       </div>

@@ -11,9 +11,9 @@ import {
 } from "react-icons/fi";
 
 export const metadata: Metadata = {
-  title: "Business Inquiry - Shofy",
+  title: "Business Inquiry - Kwahu Dwaso",
   description:
-    "Partner with Shofy - Explore wholesale, bulk orders, and business opportunities",
+    "Partner with Kwahu Dwaso - Explore wholesale, bulk orders, and business opportunities",
 };
 
 export default function InquiryPage() {
@@ -26,7 +26,7 @@ export default function InquiryPage() {
             Business Inquiry
           </Title>
           <p className="text-light-text text-lg">
-            Explore partnership opportunities and business solutions with Shofy
+            Explore partnership opportunities and business solutions with Kwahu Dwaso
           </p>
         </div>
 
@@ -103,7 +103,7 @@ export default function InquiryPage() {
                   Partnership Opportunities
                 </h3>
                 <p className="text-light-text text-sm mb-3">
-                  Interested in becoming a Shofy partner? Join our network of
+                  Interested in becoming a Kwahu Dwaso partner? Join our network of
                   trusted business partners.
                 </p>
                 <ul className="text-light-text text-sm space-y-1">
@@ -190,7 +190,7 @@ export default function InquiryPage() {
                     name="email"
                     required
                     className="w-full px-4 py-3 border border-border-color rounded-lg focus:ring-2 focus:ring-theme-color focus:border-transparent outline-none transition-colors"
-                    placeholder="business@company.com"
+                    placeholder="info@kwahudwaso.com"
                   />
                 </div>
                 <div>
@@ -206,7 +206,7 @@ export default function InquiryPage() {
                     name="phone"
                     required
                     className="w-full px-4 py-3 border border-border-color rounded-lg focus:ring-2 focus:ring-theme-color focus:border-transparent outline-none transition-colors"
-                    placeholder="+1 (555) 123-4567"
+                    placeholder="(+233 557704585)"
                   />
                 </div>
               </div>
@@ -292,13 +292,13 @@ export default function InquiryPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="mailto:business@shofy.com"
+              href="mailto:info@kwahudwaso.com"
               className="inline-block bg-theme-color text-theme-white px-6 py-3 rounded-lg hover:bg-theme-color/90 transition-colors duration-200 font-medium"
             >
               Email Business Team
             </a>
             <a
-              href="tel:+15551234567"
+              href="tel:+233557704585"
               className="inline-block bg-theme-white text-theme-color border-2 border-theme-color px-6 py-3 rounded-lg hover:bg-theme-color hover:text-theme-white transition-colors duration-200 font-medium"
             >
               Schedule a Call

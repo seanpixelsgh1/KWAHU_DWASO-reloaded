@@ -74,37 +74,38 @@ export default function AdminAnalyticsClient() {
   const stats = [
     {
       title: "Total Revenue",
-      value: `$${analytics.totalRevenue.toFixed(2)}`,
-      change: analytics.revenueGrowth,
+      value: `GH₵${(analytics.totalRevenue ?? 0).toFixed(2)}`,
+      change: analytics.revenueGrowth ?? 0,
       icon: FiDollarSign,
       color: "text-green-600",
       bgColor: "bg-green-100",
     },
     {
       title: "Total Orders",
-      value: analytics.totalOrders.toString(),
-      change: analytics.ordersGrowth,
+      value: (analytics.totalOrders ?? 0).toString(),
+      change: analytics.ordersGrowth ?? 0,
       icon: FiShoppingCart,
       color: "text-blue-600",
       bgColor: "bg-blue-100",
     },
     {
       title: "Total Users",
-      value: analytics.totalUsers.toString(),
-      change: analytics.usersGrowth,
+      value: (analytics.totalUsers ?? 0).toString(),
+      change: analytics.usersGrowth ?? 0,
       icon: FiUsers,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
     },
     {
       title: "Average Order",
-      value: `$${analytics.averageOrderValue.toFixed(2)}`,
+      value: `GH₵${(analytics.averageOrderValue ?? 0).toFixed(2)}`,
       change: 0,
       icon: FiPackage,
       color: "text-orange-600",
       bgColor: "bg-orange-100",
     },
   ];
+
 
   return (
     <div className="space-y-6">
@@ -136,7 +137,8 @@ export default function AdminAnalyticsClient() {
                       }`}
                     >
                       {stat.change > 0 ? "+" : ""}
-                      {stat.change.toFixed(1)}%
+                      {(stat.change ?? 0).toFixed(1)}%
+
                     </span>
                     <span className="text-sm text-gray-500 ml-1">
                       from last month
@@ -163,7 +165,7 @@ export default function AdminAnalyticsClient() {
             <FiCalendar className="h-5 w-5 text-gray-400" />
           </div>
           <div className="space-y-3">
-            {analytics.monthlyRevenue.map((item, index) => (
+            {(analytics.monthlyRevenue ?? []).map((item, index) => (
               <div key={index} className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">{item.month}</span>
                 <div className="flex items-center space-x-2">
@@ -172,9 +174,10 @@ export default function AdminAnalyticsClient() {
                       className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                       style={{
                         width: `${
-                          (item.revenue /
+                          ((item.revenue ?? 0) /
                             Math.max(
-                              ...analytics.monthlyRevenue.map((r) => r.revenue)
+                              1,
+                              ...(analytics.monthlyRevenue ?? []).map((r) => r.revenue ?? 0)
                             )) *
                           100
                         }%`,
@@ -182,11 +185,12 @@ export default function AdminAnalyticsClient() {
                     />
                   </div>
                   <span className="text-sm font-medium text-gray-900 w-16 text-right">
-                    ${item.revenue.toFixed(0)}
+                    GH₵{(item.revenue ?? 0).toFixed(0)}
                   </span>
                 </div>
               </div>
             ))}
+
           </div>
         </div>
 
@@ -199,7 +203,7 @@ export default function AdminAnalyticsClient() {
             <FiBarChart className="h-5 w-5 text-gray-400" />
           </div>
           <div className="space-y-3">
-            {analytics.ordersByStatus.map((item, index) => {
+            {(analytics.ordersByStatus ?? []).map((item, index) => {
               const colors = [
                 "bg-yellow-500",
                 "bg-blue-500",
@@ -221,15 +225,16 @@ export default function AdminAnalyticsClient() {
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className="text-sm font-medium text-gray-900">
-                      {item.count}
+                      {item.count ?? 0}
                     </span>
                     <span className="text-xs text-gray-500">
-                      ({item.percentage.toFixed(1)}%)
+                      ({(item.percentage ?? 0).toFixed(1)}%)
                     </span>
                   </div>
                 </div>
               );
             })}
+
           </div>
         </div>
       </div>
@@ -255,7 +260,7 @@ export default function AdminAnalyticsClient() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {analytics.topProducts.map((product, index) => (
+              {(analytics.topProducts ?? []).map((product, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -272,17 +277,19 @@ export default function AdminAnalyticsClient() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.sales} units
+                    {product.sales ?? 0} units
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    ${product.revenue.toFixed(2)}
+                    GH₵{(product.revenue ?? 0).toFixed(2)}
                   </td>
                 </tr>
               ))}
+
             </tbody>
           </table>
         </div>
-        {analytics.topProducts.length === 0 && (
+        {(analytics.topProducts ?? []).length === 0 && (
+
           <div className="px-6 py-12 text-center">
             <FiPackage className="mx-auto h-12 w-12 text-gray-400" />
             <p className="text-gray-500 mt-4">No product data available</p>

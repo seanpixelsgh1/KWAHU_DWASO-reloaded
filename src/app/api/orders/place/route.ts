@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase/config";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  updateDoc,
-  doc,
-  arrayUnion,
-} from "firebase/firestore";
+import { adminDb as db } from "@/lib/firebase/admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,10 +14,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find the user by email
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", customerEmail));
-    const snapshot = await getDocs(q);
+    // Find the user by email using Admin SDK
+    const snapshot = await db.collection("users").where("email", "==", customerEmail).get();
 
     if (snapshot.empty) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -36,7 +26,7 @@ export async function POST(request: NextRequest) {
     // Generate a unique order ID
     const orderId = `ORD-${Date.now()}-${Math.random()
       .toString(36)
-      .substr(2, 9)
+      .substring(2, 9)
       .toUpperCase()}`;
 
     // Create the order object
@@ -44,12 +34,13 @@ export async function POST(request: NextRequest) {
       id: orderId,
       orderId: orderId,
       ...orderData,
-      createdAt: new Date().toISOString(),
+      createdAt: FieldValue.serverTimestamp(),
     };
 
-    // Add the order to the user's orders array
-    await updateDoc(doc(db, "users", userDoc.id), {
-      orders: arrayUnion(order),
+    // Add the order to the user's orders array using Admin SDK
+    await userDoc.ref.update({
+      orders: FieldValue.arrayUnion(order),
+      updatedAt: FieldValue.serverTimestamp(),
     });
 
     return NextResponse.json({
@@ -59,10 +50,11 @@ export async function POST(request: NextRequest) {
       order: order,
     });
   } catch (error) {
-    console.error("Error placing order:", error);
+    console.error("API ERROR [orders-place]:", error);
     return NextResponse.json(
       { error: "Failed to place order" },
       { status: 500 }
     );
   }
 }
+

@@ -10,6 +10,7 @@ import {
   FaSignOutAlt,
   FaShieldAlt,
 } from "react-icons/fa";
+import { formatDisplayName } from "@/lib/utils/user";
 import { signOut } from "next-auth/react";
 
 interface UserProfileDropdownProps {
@@ -141,7 +142,7 @@ const UserProfileDropdown = ({ user }: UserProfileDropdownProps) => {
           }}
           className="text-xs group-hover:text-sky-color cursor-pointer duration-300"
         >
-          <p>Hello, {user?.name}</p>
+          <p>Hello, {formatDisplayName(user?.name)}</p>
           <p>view profile</p>
         </div>
       </div>
@@ -153,7 +154,7 @@ const UserProfileDropdown = ({ user }: UserProfileDropdownProps) => {
             {/* User Info Header */}
             <div className="px-4 py-2 border-b border-gray-100">
               <p className="text-sm font-semibold text-gray-900 truncate">
-                {user?.name}
+                {formatDisplayName(user?.name)}
               </p>
               <p className="text-xs text-gray-500 truncate">{user?.email}</p>
             </div>

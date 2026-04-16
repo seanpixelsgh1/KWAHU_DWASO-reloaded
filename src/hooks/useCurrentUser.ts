@@ -9,7 +9,7 @@ export function useCurrentUser(): {
   userId: string | null;
   userRole: string;
 } {
-  const userInfo = useSelector((state: RootState) => state.shopy.userInfo);
+  const userInfo = useSelector((state: RootState) => (state as any).kwahudwaso?.userInfo);
 
   return {
     user: userInfo,

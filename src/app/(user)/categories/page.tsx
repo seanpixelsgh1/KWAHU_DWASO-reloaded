@@ -6,7 +6,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Product Categories | Shofy - Shop by Category",
+  title: "Product Categories | Kwahu Dwaso - Shop by Category",
   description:
     "Explore our wide range of product categories including electronics, fashion, home decor, beauty, and more. Find exactly what you're looking for with our organized collections.",
   keywords: [
@@ -20,11 +20,11 @@ export const metadata: Metadata = {
     "shop by category",
   ],
   openGraph: {
-    title: "Product Categories | Shofy",
+    title: "Product Categories | Kwahu Dwaso",
     description:
       "Discover our wide range of product categories. Find exactly what you're looking for with our carefully curated collections.",
     url: "/categories",
-    siteName: "Shofy",
+    siteName: "Kwahu Dwaso",
     type: "website",
   },
   alternates: {

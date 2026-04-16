@@ -15,10 +15,10 @@ export const InfoNavigation = [
 
 export const banner = {
   _id: 1001,
-  priceText: "Starting at $999.90",
-  title: "The best tablet Collection 2024",
+  priceText: "The best prices in Kwahu",
+  title: "Quality Products, Swift Delivery to Your Doorstep",
   textOne: "Exclusive offer",
-  offerPrice: "-30%",
+  offerPrice: "-10%",
   textTwo: "off this week",
   buttonLink: "/products",
   image: { src: bannerImageOne },

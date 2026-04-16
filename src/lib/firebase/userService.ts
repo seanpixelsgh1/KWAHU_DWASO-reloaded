@@ -35,6 +35,8 @@ export interface FirestoreUser {
   orders: any[];
 }
 
+import { serializeFirestoreData } from "../utils/serialization";
+
 export async function fetchUserFromFirestore(
   userId: string
 ): Promise<FirestoreUser | null> {
@@ -43,10 +45,10 @@ export async function fetchUserFromFirestore(
 
     if (userDoc.exists()) {
       const userData = userDoc.data();
-      return {
+      return serializeFirestoreData({
         id: userId,
         ...userData,
-      } as FirestoreUser;
+      }) as FirestoreUser;
     }
 
     return null;

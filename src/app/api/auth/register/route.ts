@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
+import { adminDb as db } from "@/lib/firebase/admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,9 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", email));
-    const existingUser = await getDocs(q);
+    const existingUser = await db.collection("users").where("email", "==", email).get();
 
     if (!existingUser.empty) {
       return NextResponse.json(
@@ -41,14 +39,14 @@ export async function POST(request: NextRequest) {
       hashedPassword = await bcrypt.hash(password, 12);
     }
 
-    // Create user in Firestore
-    const userDoc = await addDoc(usersRef, {
+    // Create user in Firestore using Admin SDK
+    const userDoc = await db.collection("users").add({
       name,
       email,
       password: hashedPassword,
       image: image || "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
       emailVerified: oauth ? true : false, // OAuth emails are pre-verified
       role: "user",
       provider: oauth ? "oauth" : "credentials",
@@ -75,10 +73,11 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error("API ERROR [register]:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
     );
   }
 }
+

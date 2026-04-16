@@ -6,7 +6,7 @@ import Link from "next/link";
 import { BiShoppingBag } from "react-icons/bi";
 
 const CartIcon = () => {
-  const { cart } = useSelector((state: StateType) => state?.shopy);
+  const { cart } = useSelector((state: StateType) => state?.kwahudwaso);
   return (
     <Link href="/cart" className="text-2xl relative">
       <BiShoppingBag />

@@ -4,12 +4,11 @@ import AuthProvider from "@/components/auth/AuthProvider";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { UserSyncProvider } from "@/components/UserSyncProvider";
 import Head from "next/head";
-import PurchaseWidget from "@/components/PurchaseWidget";
 import StateProvider from "@/components/auth/StateProvider";
 
 export const metadata: Metadata = {
-  title: "Shofy - Multipurpose eCommerce website",
-  description: "Test application for education purpose",
+  title: "Kwahu Dwaso - Your Trusted Marketplace",
+  description: "The premier digital marketplace serving Nkawkaw and the Kwahu enclave.",
 };
 
 export default function RootLayout({
@@ -27,7 +26,6 @@ export default function RootLayout({
           <AuthProvider>
             <UserSyncProvider>
               <CurrencyProvider>{children}</CurrencyProvider>
-              <PurchaseWidget />
             </UserSyncProvider>
           </AuthProvider>
         </StateProvider>

@@ -9,7 +9,7 @@ import CartSkeleton from "./CartSkeleton";
 import Link from "next/link";
 
 const CartProducts = () => {
-  const { cart } = useSelector((state: StateType) => state?.shopy);
+  const { cart } = useSelector((state: StateType) => state?.kwahudwaso);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

@@ -1,30 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase/config";
+import { adminDb as db } from "@/lib/firebase/admin";
 import { USER_ROLES } from "@/lib/rbac/permissions";
-import {
-  collection,
-  getDocs,
-  doc,
-  updateDoc,
-  deleteDoc,
-} from "firebase/firestore";
+import { FieldValue } from "firebase-admin/firestore";
 
 export async function GET(request: NextRequest) {
   try {
-    // Fetch real users from Firebase
-    const usersSnapshot = await getDocs(collection(db, "users"));
-    const users = usersSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      role: doc.data().role || "user", // Default to user role if not set
-    })) as any[];
+    // Fetch real users from Firebase using Admin SDK
+    const usersSnapshot = await db.collection("users").get();
+    const users = usersSnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        role: data?.role || "user", // Default to user role if not set
+      };
+    }) as any[];
 
-    // Get order counts for each user
-    const ordersSnapshot = await getDocs(collection(db, "orders"));
-    const orders = ordersSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as any[];
+    // Get order counts for each user using Admin SDK
+    const ordersSnapshot = await db.collection("orders").get();
+    const orders = ordersSnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+      };
+    }) as any[];
 
     const usersWithOrderCount = users.map((user) => ({
       ...user,
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(usersWithOrderCount);
   } catch (error) {
-    console.error("Error fetching users:", error);
+    console.error("API ERROR [admin-users-get]:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -70,22 +70,22 @@ export async function PUT(request: NextRequest) {
 
     // Prepare update data
     const updateData: any = {
-      updatedAt: new Date().toISOString(),
+      updatedAt: FieldValue.serverTimestamp(),
     };
 
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
     if (role !== undefined) updateData.role = role;
 
-    // Update user in Firebase
-    await updateDoc(doc(db, "users", userId), updateData);
+    // Update user in Firebase using Admin SDK
+    await db.collection("users").doc(userId).update(updateData);
 
     return NextResponse.json({
       success: true,
       message: `User updated successfully${role ? ` with role: ${role}` : ""}`,
     });
   } catch (error) {
-    console.error("Error updating user:", error);
+    console.error("API ERROR [admin-users-put]:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -101,15 +101,16 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 });
     }
 
-    // Delete user from Firebase
-    await deleteDoc(doc(db, "users", userId));
+    // Delete user from Firebase using Admin SDK
+    await db.collection("users").doc(userId).delete();
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting user:", error);
+    console.error("API ERROR [admin-users-delete]:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
     );
   }
 }
+

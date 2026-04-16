@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hash, compare } from "bcryptjs";
-import { db } from "@/lib/firebase/config";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  updateDoc,
-  doc,
-} from "firebase/firestore";
+import { adminDb as db } from "@/lib/firebase/admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export async function PUT(request: NextRequest) {
   try {
@@ -31,10 +24,8 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Find user in Firestore
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", email));
-    const querySnapshot = await getDocs(q);
+    // Find user in Firestore using Admin SDK
+    const querySnapshot = await db.collection("users").where("email", "==", email).get();
 
     if (querySnapshot.empty) {
       return NextResponse.json(
@@ -67,11 +58,10 @@ export async function PUT(request: NextRequest) {
     // Hash new password
     const hashedPassword = await hash(newPassword, 12);
 
-    // Update password in Firestore
-    const userDocRef = doc(db, "users", userDoc.id);
-    await updateDoc(userDocRef, {
+    // Update password in Firestore using Admin SDK
+    await userDoc.ref.update({
       password: hashedPassword,
-      updatedAt: new Date().toISOString(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
 
     return NextResponse.json({
@@ -81,10 +71,11 @@ export async function PUT(request: NextRequest) {
         : "Password set successfully",
     });
   } catch (error) {
-    console.error("Password update error:", error);
+    console.error("API ERROR [update-password]:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }
 }
+

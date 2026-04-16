@@ -11,10 +11,10 @@ import {
   FiSearch,
 } from "react-icons/fi";
 
-// export const metadata: Metadata = {
-//   title: "FAQs - Shofy",
-//   description: "Frequently Asked Questions - Find answers to common questions about Shofy",
-// };
+export const metadata: Metadata = {
+  title: "FAQs - Kwahu Dwaso",
+  description: "Frequently Asked Questions - Find answers to common questions about Kwahu Dwaso",
+};
 
 const faqCategories = [
   {
@@ -156,7 +156,7 @@ export default function FAQsPage() {
             Frequently Asked Questions
           </Title>
           <p className="text-light-text text-lg mb-8">
-            Find answers to common questions about shopping with Shofy
+            Find answers to common questions about shopping with Kwahu Dwaso
           </p>
 
           {/* Search Bar */}
@@ -335,7 +335,7 @@ export default function FAQsPage() {
               Contact Support
             </a>
             <a
-              href="mailto:support@shofy.com"
+              href="mailto:info@kwahudwaso.com"
               className="inline-block bg-theme-white text-theme-color border-2 border-theme-color px-6 py-3 rounded-lg hover:bg-theme-color hover:text-theme-white transition-colors duration-200 font-medium"
             >
               Email Us

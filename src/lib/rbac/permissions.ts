@@ -28,6 +28,9 @@ export function getDefaultPageForRole(role: UserRole): string {
 
 // Additional utility functions for user role checking
 import { FirestoreUser } from "@/lib/firebase/userService";
+import { FORCE_PREMIUM } from "@/lib/constants/admin";
+
+const isDev = process.env.NODE_ENV === "development";
 
 export function hasRole(user: FirestoreUser | null, role: string): boolean {
   return user?.role === role;
@@ -41,10 +44,12 @@ export function hasAnyRole(
 }
 
 export function isAdminUser(user: FirestoreUser | null): boolean {
+  if (FORCE_PREMIUM && isDev) return true;
   return hasRole(user, USER_ROLES.ADMIN);
 }
 
 export function canAccessAdminPanel(user: FirestoreUser | null): boolean {
+  if (FORCE_PREMIUM && isDev) return true;
   return hasAnyRole(user, [USER_ROLES.ADMIN, USER_ROLES.ACCOUNT]);
 }
 
@@ -213,6 +218,7 @@ export function hasPermission(
   action: string
 ): boolean {
   const rolePermissions = ROLE_PERMISSIONS[userRole];
+  if (FORCE_PREMIUM && isDev) return true;
   if (!rolePermissions) return false;
 
   const resourcePermissions =

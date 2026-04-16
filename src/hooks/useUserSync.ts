@@ -4,28 +4,47 @@ import { useDispatch, useSelector } from "react-redux";
 import { addUser, removeUser } from "@/redux/shofySlice";
 import { fetchUserFromFirestore } from "@/lib/firebase/userService";
 import type { RootState } from "@/redux/store";
+import { formatDisplayName } from "@/lib/utils/user";
 
 export function useUserSync() {
   const { data: session, status } = useSession();
   const dispatch = useDispatch();
-  const userInfo = useSelector((state: RootState) => state.shopy.userInfo);
+  const userInfo = useSelector((state: RootState) => (state as any).kwahudwaso?.userInfo);
 
   useEffect(() => {
     const syncUserData = async () => {
       if (status === "loading") return;
 
       if (session?.user?.id) {
-        // If we don't have user data in store or the session ID doesn't match
-        if (!userInfo || userInfo.id !== session.user.id) {
+        // Trigger sync if:
+        // 1. No user data in store
+        // 2. User ID doesn't match session
+        // 3. User Role in store doesn't match the hardened session role (e.g. after migration or God Mode)
+        const needsSync = !userInfo || 
+                          userInfo.id !== session.user.id || 
+                          userInfo.role !== session.user.role;
+
+        if (needsSync) {
           try {
             const firestoreUser = await fetchUserFromFirestore(session.user.id);
             if (firestoreUser) {
-              dispatch(addUser(firestoreUser));
+              // Light validation: ensure name is correct before dispatching to Redux
+              const sanitizedUser = {
+                ...firestoreUser,
+                name: formatDisplayName(
+                  firestoreUser.name,
+                  session.user.name || session.user.email?.split("@")[0] || "User",
+                  firestoreUser.profile
+                ),
+                // Ensure session-level role elevation (e.g. God Mode) is preserved in Redux
+                role: session.user.role === "admin" ? "admin" : firestoreUser.role,
+              };
+              dispatch(addUser(sanitizedUser));
             } else {
               // If no Firestore data, create minimal user from session
               const sessionUser = {
                 id: session.user.id,
-                name: session.user.name || "",
+                name: formatDisplayName(session.user.name, session.user.email?.split("@")[0] || "User", undefined),
                 email: session.user.email || "",
                 image: session.user.image || "",
                 role: session.user.role || "user",

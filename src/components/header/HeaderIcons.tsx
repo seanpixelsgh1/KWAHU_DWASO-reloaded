@@ -7,7 +7,7 @@ import { useSelector } from "react-redux";
 import { StateType } from "../../../type";
 
 const HeaderIcons = () => {
-  const { cart, favorite } = useSelector((state: StateType) => state?.shopy);
+  const { cart, favorite } = useSelector((state: StateType) => state?.kwahudwaso);
 
   return (
     <>

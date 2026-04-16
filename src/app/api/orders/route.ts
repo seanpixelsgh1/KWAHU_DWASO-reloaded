@@ -13,19 +13,9 @@ import {
   PaymentMethod,
 } from "@/lib/orderStatus";
 import { hasPermission } from "@/lib/rbac/permissions";
-import { db } from "@/lib/firebase/config";
-import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  serverTimestamp,
-} from "firebase/firestore";
-import { auth } from "../../../../auth";
+import { adminDb as db } from "@/lib/firebase/admin";
+import { FieldValue } from "firebase-admin/firestore";
+import { auth } from "@/auth";
 
 // GET - Fetch orders based on user role
 export async function GET(request: NextRequest) {
@@ -36,14 +26,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user role
-    const userDoc = await getDoc(doc(db, "users", session.user.email));
-    if (!userDoc.exists()) {
+    // Get user role using Admin SDK
+    const userDoc = await db.collection("users").doc(session.user.email).get();
+    if (!userDoc.exists) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const userData = userDoc.data();
-    const userRole = userData.role || "user";
+    const userRole = userData?.role || "user";
 
     // Check if user has permission to view orders
     if (!hasPermission(userRole, "orders", "read")) {
@@ -58,39 +48,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ orders: [] });
     }
 
-    // Build query based on role
-    let ordersQuery;
+    // Build query based on role using Admin SDK
+    let ordersQuery: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = db.collection("orders");
 
     if (userRole === "admin" || userRole === "account") {
       // Admin and accountant can see all orders
-      ordersQuery = query(
-        collection(db, "orders"),
-        orderBy("createdAt", "desc")
-      );
+      ordersQuery = ordersQuery.orderBy("createdAt", "desc");
     } else {
       // Role-based filtering
-      ordersQuery = query(
-        collection(db, "orders"),
-        where("status", "in", visibleStatuses),
-        orderBy("createdAt", "desc")
-      );
+      ordersQuery = ordersQuery
+        .where("status", "in", visibleStatuses)
+        .orderBy("createdAt", "desc");
     }
 
-    const ordersSnapshot = await getDocs(ordersQuery);
-    const orders = ordersSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt:
-        doc.data().createdAt?.toDate?.()?.toISOString() ||
-        new Date().toISOString(),
-      updatedAt:
-        doc.data().updatedAt?.toDate?.()?.toISOString() ||
-        new Date().toISOString(),
-    }));
+    const ordersSnapshot = await ordersQuery.get();
+    const orders = ordersSnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt:
+          data?.createdAt?.toDate ? data.createdAt.toDate().toISOString() : 
+          (data?.createdAt || new Date().toISOString()),
+        updatedAt:
+          data?.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : 
+          (data?.updatedAt || new Date().toISOString()),
+      };
+    });
 
     return NextResponse.json({ orders });
   } catch (error) {
-    console.error("Error fetching orders:", error);
+    console.error("API ERROR [orders-get]:", error);
     return NextResponse.json(
       { error: "Failed to fetch orders" },
       { status: 500 }
@@ -117,14 +105,14 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Get user role
-    const userDoc = await getDoc(doc(db, "users", session.user.email));
-    if (!userDoc.exists()) {
+    // Get user role using Admin SDK
+    const userDoc = await db.collection("users").doc(session.user.email).get();
+    if (!userDoc.exists) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const userData = userDoc.data();
-    const userRole = userData.role || "user";
+    const userRole = userData?.role || "user";
 
     // Check if user has permission to update orders
     if (!hasPermission(userRole, "orders", "update")) {
@@ -134,21 +122,25 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Get current order
-    const orderRef = doc(db, "orders", orderId);
-    const orderDoc = await getDoc(orderRef);
+    // Get current order using Admin SDK
+    const orderRef = db.collection("orders").doc(orderId);
+    const orderDoc = await orderRef.get();
 
-    if (!orderDoc.exists()) {
+    if (!orderDoc.exists) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
     const currentOrder = orderDoc.data();
+    if (!currentOrder) {
+      return NextResponse.json({ error: "Order data is empty" }, { status: 404 });
+    }
+
     const currentStatus = currentOrder.status as OrderStatus;
     const currentPaymentStatus = currentOrder.paymentStatus as PaymentStatus;
     const paymentMethod = currentOrder.paymentMethod as PaymentMethod;
 
     const updateData: any = {
-      updatedAt: serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
       updatedBy: session.user.email,
     };
 
@@ -180,7 +172,7 @@ export async function PUT(request: NextRequest) {
       const statusHistory = currentOrder.statusHistory || [];
       statusHistory.push({
         status,
-        timestamp: new Date().toISOString(),
+        timestamp: FieldValue.serverTimestamp(),
         updatedBy: session.user.email,
         userRole,
         notes: deliveryNotes || `Status changed to ${status}`,
@@ -213,7 +205,7 @@ export async function PUT(request: NextRequest) {
       const paymentHistory = currentOrder.paymentHistory || [];
       paymentHistory.push({
         status: paymentStatus,
-        timestamp: new Date().toISOString(),
+        timestamp: FieldValue.serverTimestamp(),
         updatedBy: session.user.email,
         userRole,
         method: paymentMethod,
@@ -227,7 +219,7 @@ export async function PUT(request: NextRequest) {
       const notes = currentOrder.deliveryNotes || [];
       notes.push({
         note: deliveryNotes,
-        timestamp: new Date().toISOString(),
+        timestamp: FieldValue.serverTimestamp(),
         addedBy: session.user.email,
         userRole,
       });
@@ -235,22 +227,25 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update the order
-    await updateDoc(orderRef, updateData);
+    await orderRef.update(updateData);
 
     // Also update user's order subcollection if it exists
     try {
       if (currentOrder.userEmail) {
-        const userOrderRef = doc(
-          db,
-          "users",
-          currentOrder.userEmail,
-          "orders",
-          orderId
-        );
-        await updateDoc(userOrderRef, updateData);
+        const userOrderRef = db
+          .collection("users")
+          .doc(currentOrder.userEmail)
+          .collection("orders")
+          .doc(orderId);
+        
+        // Use a check to see if it exists before updating or use merge set
+        const userOrderDoc = await userOrderRef.get();
+        if (userOrderDoc.exists) {
+          await userOrderRef.update(updateData);
+        }
       }
     } catch (error) {
-      console.log("User order subcollection not found, skipping update");
+      console.log("User order subcollection update failed or not found, skipping");
     }
 
     return NextResponse.json({
@@ -260,7 +255,7 @@ export async function PUT(request: NextRequest) {
       updates: updateData,
     });
   } catch (error) {
-    console.error("Error updating order:", error);
+    console.error("API ERROR [orders-put]:", error);
     return NextResponse.json(
       { error: "Failed to update order" },
       { status: 500 }
@@ -288,12 +283,12 @@ export async function POST(request: NextRequest) {
           ? PAYMENT_STATUSES.PENDING
           : PAYMENT_STATUSES.PAID,
       userEmail: session.user.email,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
       statusHistory: [
         {
           status: ORDER_STATUSES.PENDING,
-          timestamp: new Date().toISOString(),
+          timestamp: FieldValue.serverTimestamp(),
           updatedBy: session.user.email,
           userRole: "user",
           notes: "Order placed",
@@ -305,7 +300,7 @@ export async function POST(request: NextRequest) {
             orderData.paymentMethod === PAYMENT_METHODS.CASH
               ? PAYMENT_STATUSES.PENDING
               : PAYMENT_STATUSES.PAID,
-          timestamp: new Date().toISOString(),
+          timestamp: FieldValue.serverTimestamp(),
           updatedBy: session.user.email,
           userRole: "user",
           method: orderData.paymentMethod || PAYMENT_METHODS.ONLINE,
@@ -316,19 +311,17 @@ export async function POST(request: NextRequest) {
       ],
     };
 
-    // Add to orders collection
-    const orderRef = doc(collection(db, "orders"));
-    await updateDoc(orderRef, newOrder);
+    // Add to orders collection using Admin SDK
+    const orderRef = db.collection("orders").doc();
+    await orderRef.set(newOrder);
 
-    // Add to user's orders subcollection
-    const userOrderRef = doc(
-      db,
-      "users",
-      session.user.email,
-      "orders",
-      orderRef.id
-    );
-    await updateDoc(userOrderRef, newOrder);
+    // Add to user's orders subcollection using Admin SDK
+    const userOrderRef = db
+      .collection("users")
+      .doc(session.user.email)
+      .collection("orders")
+      .doc(orderRef.id);
+    await userOrderRef.set(newOrder);
 
     return NextResponse.json({
       success: true,
@@ -336,10 +329,11 @@ export async function POST(request: NextRequest) {
       message: "Order created successfully",
     });
   } catch (error) {
-    console.error("Error creating order:", error);
+    console.error("API ERROR [orders-post]:", error);
     return NextResponse.json(
       { error: "Failed to create order" },
       { status: 500 }
     );
   }
 }
+

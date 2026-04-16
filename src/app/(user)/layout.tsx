@@ -4,8 +4,8 @@ import Footer from "@/components/Footer";
 import Layout from "@/components/layout/Layout";
 
 export const metadata: Metadata = {
-  title: "Shofy - Multipurpose eCommerce website",
-  description: "Test application for education purpose",
+  title: "Kwahu Dwaso - Your Trusted Marketplace",
+  description: "The premier digital marketplace serving Nkawkaw and the Kwahu enclave.",
 };
 
 export default function RootLayout({

@@ -11,6 +11,7 @@ import {
   FaHeart,
   FaChevronDown,
 } from "react-icons/fa";
+import { formatDisplayName } from "@/lib/utils/user";
 
 export default function UserProfile() {
   const { data: session, status } = useSession();
@@ -67,7 +68,7 @@ export default function UserProfile() {
         )}
         <div className="hidden md:block text-left">
           <p className="text-sm font-medium text-gray-700">
-            {session?.user?.name?.split(" ")[0] || "User"}
+            {formatDisplayName(session?.user?.name).split(" ")[0]}
           </p>
           <p className="text-xs text-gray-500 truncate max-w-32">
             {session?.user?.email}
@@ -84,7 +85,7 @@ export default function UserProfile() {
       {isDropdownOpen && (
         <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
           <div className="p-4 border-b border-gray-100">
-            <p className="font-medium text-gray-900">{session?.user?.name}</p>
+            <p className="font-medium text-gray-900">{formatDisplayName(session?.user?.name)}</p>
             <p className="text-sm text-gray-500">{session?.user?.email}</p>
           </div>
 

@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Container from "@/components/Container";
 import PriceFormat from "@/components/PriceFormat";
-import { loadStripe } from "@stripe/stripe-js";
+
 import ProtectedRoute from "@/components/ProtectedRoute";
 import {
   FiPackage,
@@ -16,6 +16,7 @@ import {
   FiTruck,
 } from "react-icons/fi";
 import Link from "next/link";
+import toast from "react-hot-toast";
 
 const CheckoutPage = () => {
   const { data: session } = useSession();
@@ -24,7 +25,7 @@ const CheckoutPage = () => {
 
   const [loading, setLoading] = useState(true);
   const [existingOrder, setExistingOrder] = useState<any>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "cod" | null>(
+  const [paymentMethod, setPaymentMethod] = useState<"online" | "cod" | null>(
     null
   );
   const [paymentProcessing, setPaymentProcessing] = useState(false);
@@ -119,12 +120,9 @@ const CheckoutPage = () => {
     }
   };
 
-  const handleStripePayment = async () => {
+  const initializePaystackCheckout = async () => {
     try {
       setPaymentProcessing(true);
-      const stripe = await loadStripe(
-        process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
-      );
 
       const response = await fetch("/api/checkout", {
         method: "POST",
@@ -137,32 +135,32 @@ const CheckoutPage = () => {
           shippingAddress: existingOrder.shippingAddress,
           orderId: existingOrder.id,
           orderAmount: existingOrder.amount,
+          userId: session?.user?.id
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
         console.error("Checkout API error:", errorData);
-        throw new Error(errorData.error || "Failed to create checkout session");
+        throw new Error(errorData.error || "Failed to create checkout order");
       }
 
-      const checkoutSession = await response.json();
+      const checkoutData = await response.json();
 
-      if (!checkoutSession.id) {
-        throw new Error("No session ID returned from checkout");
+      if (!checkoutData.orderId) {
+        throw new Error("No order ID returned from checkout");
       }
 
-      const result: any = await stripe?.redirectToCheckout({
-        sessionId: checkoutSession.id,
-      });
-
-      if (result.error) {
-        console.error("Stripe redirect error:", result.error);
-        alert(result.error.message);
+      // Redirect to Paystack secure checkout
+      if (checkoutData.authorization_url) {
+        window.location.href = checkoutData.authorization_url;
+      } else {
+        throw new Error("No authorization URL returned from Paystack");
       }
+
     } catch (error) {
       console.error("Error processing payment:", error);
-      alert(
+      toast.error(
         `Payment processing failed: ${
           error instanceof Error ? error.message : "Please try again."
         }`
@@ -419,14 +417,14 @@ const CheckoutPage = () => {
                   </div>
                 </div>
 
-                {/* Stripe Payment */}
+                {/* Online Payment */}
                 <div
                   className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
-                    paymentMethod === "stripe"
+                    paymentMethod === "online"
                       ? "border-theme-color bg-blue-50"
                       : "border-gray-200 hover:border-gray-300"
                   }`}
-                  onClick={() => setPaymentMethod("stripe")}
+                  onClick={() => setPaymentMethod("online")}
                 >
                   <div className="flex items-center">
                     <FiCreditCard className="w-5 h-5 mr-3 text-gray-600" />
@@ -435,17 +433,17 @@ const CheckoutPage = () => {
                         Pay with Card
                       </h4>
                       <p className="text-sm text-gray-600">
-                        Secure payment via Stripe
+                        Secure online payment
                       </p>
                     </div>
                     <div
                       className={`w-4 h-4 rounded-full border-2 ${
-                        paymentMethod === "stripe"
+                        paymentMethod === "online"
                           ? "border-theme-color bg-theme-color"
                           : "border-gray-300"
                       }`}
                     >
-                      {paymentMethod === "stripe" && (
+                      {paymentMethod === "online" && (
                         <div className="w-full h-full rounded-full bg-white scale-50"></div>
                       )}
                     </div>
@@ -470,9 +468,9 @@ const CheckoutPage = () => {
                       "Confirm Cash on Delivery"
                     )}
                   </button>
-                ) : paymentMethod === "stripe" ? (
+                ) : paymentMethod === "online" ? (
                   <button
-                    onClick={handleStripePayment}
+                    onClick={initializePaystackCheckout}
                     disabled={paymentProcessing}
                     className="w-full bg-theme-color text-white py-3 px-4 rounded-lg hover:bg-theme-color/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   >

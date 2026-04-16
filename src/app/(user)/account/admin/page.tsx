@@ -1,8 +1,20 @@
-import Button from "@/components/ui/Button";
-import { FiLock, FiExternalLink } from "react-icons/fi";
-import { MdDashboard } from "react-icons/md";
+import { auth } from "@/auth";
+import AdminDashboardClient from "@/components/admin/AdminDashboardClient";
+import { FORCE_PREMIUM } from "@/lib/constants/admin";
+import { UserRole } from "@/lib/rbac/roles";
 
-export default function AdminDashboardPage() {
+export default async function AdminDashboardPage() {
+  const session = await auth();
+  const userRole = session?.user?.role as UserRole;
+  const isDev = process.env.NODE_ENV === "development";
+  
+  // Show dashboard if force premium is active in dev OR user is actual admin
+  const showDashboard = (FORCE_PREMIUM && isDev) || userRole === "admin";
+
+  if (showDashboard) {
+    return <AdminDashboardClient />;
+  }
+
   return (
     <div className="bg-white rounded-lg shadow p-8 max-w-2xl mx-auto">
       {/* Header Section */}
@@ -27,10 +39,7 @@ export default function AdminDashboardPage() {
       <div className="space-y-6">
         <div className="bg-gray-50 rounded-lg p-6 text-center">
           <p className="text-lg text-gray-700 mb-4">
-            🚀 The Admin Dashboard is available in the{" "}
-            <span className="font-semibold text-theme-color">
-              Premium Version
-            </span>
+            🚀 The Admin Dashboard is currently under maintenance or being updated.
           </p>
           <p className="text-gray-600 mb-6">
             Unlock powerful admin features including:
@@ -90,18 +99,8 @@ export default function AdminDashboardPage() {
 
         {/* CTA Section */}
         <div className="text-center">
-          <Button
-            href="https://buymeacoffee.com/reactbd/e/448682"
-            size="lg"
-            className="inline-flex items-center bg-gradient-to-r from-theme-color to-theme-color/80 hover:from-theme-color/90 hover:to-theme-color text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
-          >
-            🎯 Upgrade to Premium
-            <FiExternalLink className="ml-2 h-4 w-4" />
-          </Button>
-
           <p className="text-sm text-gray-500 mt-4">
-            Get instant access to all premium features and support the
-            development!
+            Thank you for using Kwahu Dwaso. Our admin suite is being refined for the best experience.
           </p>
         </div>
       </div>

@@ -13,7 +13,7 @@ import toast from "react-hot-toast";
 import PriceFormat from "@/components/PriceFormat";
 
 const FavoritePage = () => {
-  const { favorite } = useSelector((state: StateType) => state?.shopy);
+  const { favorite } = useSelector((state: StateType) => state?.kwahudwaso);
   const { data: session } = useSession();
   const dispatch = useDispatch();
 

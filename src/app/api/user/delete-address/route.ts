@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase/config";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  updateDoc,
-  doc,
-} from "firebase/firestore";
+import { adminDb as db } from "@/lib/firebase/admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -20,16 +13,19 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", email));
-    const snapshot = await getDocs(q);
+    const snapshot = await db.collection("users").where("email", "==", email).get();
 
     if (snapshot.empty) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const userDoc = snapshot.docs[0];
-    const userData = userDoc.data();
+    const userData = userDoc.exists ? userDoc.data() : null;
+
+    if (!userData) {
+      return NextResponse.json({ error: "User data is empty" }, { status: 404 });
+    }
+
     let addresses = userData.profile?.addresses || [];
 
     // Remove address at specified index
@@ -42,14 +38,14 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await updateDoc(doc(db, "users", userDoc.id), {
+    await userDoc.ref.update({
       "profile.addresses": addresses,
-      updatedAt: new Date().toISOString(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
 
     return NextResponse.json({ success: true, addresses });
   } catch (error) {
-    console.error("Address deletion error:", error);
+    console.error("API ERROR [delete-address]:", error);
     return NextResponse.json(
       {
         error: "Failed to delete address",
@@ -59,3 +55,4 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+

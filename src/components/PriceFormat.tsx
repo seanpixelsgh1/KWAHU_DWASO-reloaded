@@ -12,7 +12,8 @@ type CurrencyCode =
   | "CHF"
   | "CNY"
   | "INR"
-  | "BDT";
+  | "BDT"
+  | "GHS";
 
 interface Props {
   amount?: number;

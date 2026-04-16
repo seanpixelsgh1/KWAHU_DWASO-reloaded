@@ -12,6 +12,9 @@ import { FiAlertCircle, FiLoader } from "react-icons/fi";
 import { FaSignInAlt } from "react-icons/fa";
 import Link from "next/link";
 import { resetCart } from "@/redux/shofySlice";
+import toast from "react-hot-toast";
+
+import { formatDisplayName } from "@/lib/utils/user";
 
 interface Props {
   cart: ProductType[];
@@ -65,7 +68,7 @@ const CartSummary = ({ cart }: Props) => {
     }
 
     if (!selectedAddress) {
-      alert("Please select a shipping address before placing your order.");
+      toast.error("Please select a shipping address before placing your order.");
       return;
     }
 
@@ -74,7 +77,7 @@ const CartSummary = ({ cart }: Props) => {
       // Calculate totals
       const finalTotal = totalAmt - discountAmt + shippingCost;
 
-      // Prepare order data
+      // Prepare order data suited for /api/checkout
       const orderData = {
         items: cart.map((item: ProductType) => ({
           id: item.id,
@@ -82,21 +85,14 @@ const CartSummary = ({ cart }: Props) => {
           price: item.price * (1 - item.discountPercentage / 100),
           quantity: item.quantity,
           images: item.images,
-          total:
-            item.price * (1 - item.discountPercentage / 100) * item.quantity!,
+          total: item.price * (1 - item.discountPercentage / 100) * item.quantity!,
         })),
-        amount: finalTotal.toString(),
-        currency: "USD",
-        status: "confirmed",
-        paymentStatus: "pending",
-        customerEmail: session?.user?.email,
-        customerName: session?.user?.name,
+        email: session?.user?.email,
+        orderAmount: finalTotal,
         shippingAddress: selectedAddress,
-        createdAt: new Date().toISOString(),
       };
 
-      // Place order
-      const response = await fetch("/api/orders/place", {
+      const res = await fetch("/api/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -104,20 +100,27 @@ const CartSummary = ({ cart }: Props) => {
         body: JSON.stringify(orderData),
       });
 
-      if (response.ok) {
-        const result = await response.json();
+      const data = await res.json();
 
-        // Clear cart after successful order placement
-        dispatch(resetCart());
-
-        // Navigate to checkout page with order ID for payment method selection
-        router.push(`/checkout?orderId=${result.orderId}`);
-      } else {
-        throw new Error("Failed to place order");
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Checkout failed");
       }
-    } catch (error) {
-      console.error("Error placing order:", error);
-      alert("Failed to place order. Please try again.");
+
+      // Clear cart after successful order creation
+      dispatch(resetCart());
+
+      // ✅ Paystack redirect
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url;
+        return;
+      }
+
+      // fallback (dev mode)
+      router.push(`/success?order_id=${data.orderId}`);
+
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to place order");
     } finally {
       setPlacing(false);
     }

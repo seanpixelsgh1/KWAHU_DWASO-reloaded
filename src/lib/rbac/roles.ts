@@ -1,4 +1,7 @@
 // Role-based access control types and utilities
+import { FORCE_PREMIUM } from "@/lib/constants/admin";
+
+const isDev = process.env.NODE_ENV === "development";
 
 export type UserRole =
   | "user"
@@ -246,6 +249,7 @@ export function hasPermission(
   userRole: UserRole,
   permission: keyof RolePermissions
 ): boolean {
+  if (FORCE_PREMIUM && isDev) return true;
   return ROLE_PERMISSIONS[userRole][permission];
 }
 
@@ -261,6 +265,7 @@ export function canAccessDashboard(
     user: "canAccessUserDashboard",
   } as const;
 
+  if (FORCE_PREMIUM && isDev) return true;
   return hasPermission(userRole, permissionMap[dashboardType]);
 }
 

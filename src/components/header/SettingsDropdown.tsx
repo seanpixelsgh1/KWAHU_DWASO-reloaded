@@ -16,6 +16,7 @@ import {
   FiHelpCircle,
   FiStar,
 } from "react-icons/fi";
+import { formatDisplayName } from "@/lib/utils/user";
 
 const SettingsDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -145,7 +146,10 @@ const SettingsDropdown = () => {
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {session?.user?.name || "User"}
+                  {formatDisplayName(
+                    session?.user?.name,
+                    (session?.user as any)?.role === "admin" ? "Admin" : "User"
+                  )}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
                   {session?.user?.email}

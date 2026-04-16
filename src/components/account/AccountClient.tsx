@@ -7,6 +7,7 @@ import ProfileEditForm from "@/components/account/ProfileEditForm";
 import Sidebar from "@/components/account/Sidebar";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useUserSync } from "@/hooks/useUserSync";
+import { formatDisplayName } from "@/lib/utils/user";
 
 interface UserProfile {
   firstName: string;
@@ -80,12 +81,8 @@ export default function AccountClient() {
         },
         body: JSON.stringify({
           email: session?.user?.email,
-          profile: {
-            firstName: updatedProfile.firstName,
-            lastName: updatedProfile.lastName,
-            phone: updatedProfile.phone,
-          },
-          name: `${updatedProfile.firstName} ${updatedProfile.lastName}`,
+          name: updatedProfile.name,
+          phone: updatedProfile.phone,
           image: updatedProfile.image,
           currentPassword: updatedProfile.currentPassword,
           newPassword: updatedProfile.newPassword,
@@ -155,14 +152,14 @@ export default function AccountClient() {
               ) : (
                 <div className="w-20 h-20 rounded-full bg-gray-300 flex items-center justify-center">
                   <span className="text-2xl font-semibold text-gray-600">
-                    {session?.user?.name?.charAt(0)?.toUpperCase() || "U"}
+                    {formatDisplayName(session?.user?.name, "U", profile).charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {session?.user?.name || "User"}
+                {formatDisplayName(session?.user?.name, "No Name Set", profile)}
               </h2>
               <p className="text-gray-600">{session?.user?.email}</p>
               {profile?.phone && (
@@ -200,7 +197,7 @@ export default function AccountClient() {
           </div>
         </div>
 
-        {/* User Information from Store */}
+        {/* Current User Information (Store State) */}
         <div className="bg-blue-50 rounded-lg p-6 mb-8">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             Current User Information (From Store)
@@ -213,7 +210,7 @@ export default function AccountClient() {
               </p>
               <p>
                 <span className="font-medium">Name:</span>{" "}
-                {user?.name || "Not available"}
+                {formatDisplayName(user?.name, "No Name Set", user?.profile)}
               </p>
               <p>
                 <span className="font-medium">Email:</span>{" "}
@@ -255,29 +252,14 @@ export default function AccountClient() {
               </p>
               <p>
                 <span className="font-medium">Provider:</span>{" "}
-                {user?.provider || "Not available"}
+                {user?.provider || "credentials"}
               </p>
               <p>
                 <span className="font-medium">Created At:</span>{" "}
-                {user?.createdAt
-                  ? new Date(user.createdAt).toLocaleDateString()
-                  : "Not available"}
+                {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Not available"}
               </p>
             </div>
           </div>
-          {user?.profile && (
-            <div className="mt-4 pt-4 border-t border-blue-200">
-              <p>
-                <span className="font-medium">Profile:</span>
-              </p>
-              <div className="ml-4 text-xs text-gray-600">
-                <p>First Name: {user.profile.firstName}</p>
-                <p>Last Name: {user.profile.lastName}</p>
-                <p>Phone: {user.profile.phone || "Not provided"}</p>
-                <p>Addresses: {user.profile.addresses?.length || 0} saved</p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Quick Actions */}

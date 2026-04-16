@@ -49,7 +49,7 @@ const persistConfig = {
 const persistedReducer = persistReducer(persistConfig, shopyReducer);
 
 export const store = configureStore({
-  reducer: { shopy: persistedReducer },
+  reducer: { kwahudwaso: persistedReducer },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {

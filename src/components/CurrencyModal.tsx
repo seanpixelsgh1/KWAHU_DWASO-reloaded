@@ -11,7 +11,8 @@ type CurrencyCode =
   | "CHF"
   | "CNY"
   | "INR"
-  | "BDT";
+  | "BDT"
+  | "GHS";
 
 interface CurrencyModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ const currencies: Array<{
   { code: "CNY", name: "Chinese Yuan", symbol: "¥", flag: "🇨🇳" },
   { code: "INR", name: "Indian Rupee", symbol: "₹", flag: "🇮🇳" },
   { code: "BDT", name: "Bangladeshi Taka", symbol: "৳", flag: "🇧🇩" },
+  { code: "GHS", name: "Ghanaian Cedi", symbol: "GH₵", flag: "🇬🇭" },
 ];
 
 const CurrencyModal = ({

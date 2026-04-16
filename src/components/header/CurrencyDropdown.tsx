@@ -14,7 +14,8 @@ type CurrencyCode =
   | "AUD"
   | "INR"
   | "BDT"
-  | "PKR";
+  | "PKR"
+  | "GHS";
 
 const currencies: {
   code: CurrencyCode;
@@ -36,6 +37,7 @@ const currencies: {
   { code: "BDT", name: "Bangladeshi Taka", symbol: "৳", region: "South Asia" },
   { code: "INR", name: "Indian Rupee", symbol: "₹", region: "South Asia" },
   { code: "PKR", name: "Pakistani Rupee", symbol: "₨", region: "South Asia" },
+  { code: "GHS", name: "Ghanaian Cedi", symbol: "GH₵", region: "Africa" },
 ];
 
 const CurrencyDropdown = () => {

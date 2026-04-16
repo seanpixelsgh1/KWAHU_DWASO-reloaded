@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase/config";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  updateDoc,
-  doc,
-} from "firebase/firestore";
+import { adminDb as db } from "@/lib/firebase/admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,25 +9,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
 
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", email));
-    const snapshot = await getDocs(q);
+    const snapshot = await db.collection("users").where("email", "==", email).get();
 
     if (snapshot.empty) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const userDoc = snapshot.docs[0];
-    const userData = userDoc.data();
+    const userData = userDoc.exists ? userDoc.data() : null;
+
+    if (!userData) {
+      return NextResponse.json({ error: "User data is empty" }, { status: 404 });
+    }
 
     // Ensure addresses array exists for backward compatibility
     if (userData.profile && !userData.profile.addresses) {
       userData.profile.addresses = [];
     }
 
-    return NextResponse.json({ ...userData, id: userDoc.id });
+    // Fetch unified orders from single source of truth (using userId)
+    const ordersSnapshot = await db.collection("orders").where("userId", "==", userDoc.id).get();
+    const orders = ordersSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
+        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
+      };
+    });
+    
+    // Sort descending by date
+    orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return NextResponse.json({ ...userData, orders, id: userDoc.id });
   } catch (error) {
-    console.error("Profile GET error:", error);
+    console.error("API ERROR [profile-get]:", error);
     return NextResponse.json(
       { error: "Failed to fetch profile" },
       { status: 500 }
@@ -51,16 +61,18 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
 
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", email));
-    const snapshot = await getDocs(q);
+    const snapshot = await db.collection("users").where("email", "==", email).get();
 
     if (snapshot.empty) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const userDoc = snapshot.docs[0];
-    const userData = userDoc.data();
+    const userData = userDoc.exists ? userDoc.data() : null;
+
+    if (!userData) {
+        return NextResponse.json({ error: "User data is empty" }, { status: 404 });
+    }
 
     let addresses = userData.profile?.addresses || [];
 
@@ -92,7 +104,7 @@ export async function PUT(request: NextRequest) {
     // Prepare update data, only include defined fields
     const updateData: any = {
       "profile.addresses": addresses,
-      updatedAt: new Date().toISOString(),
+      updatedAt: FieldValue.serverTimestamp(),
     };
     if (typeof name !== "undefined") {
       updateData.name = name;
@@ -104,11 +116,11 @@ export async function PUT(request: NextRequest) {
       updateData.image = image;
     }
 
-    await updateDoc(doc(db, "users", userDoc.id), updateData);
+    await userDoc.ref.update(updateData);
 
     return NextResponse.json({ success: true, addresses });
   } catch (error) {
-    console.error("Profile update error:", error);
+    console.error("API ERROR [profile-update]:", error);
     return NextResponse.json(
       {
         error: "Failed to update profile",
@@ -118,3 +130,4 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
+

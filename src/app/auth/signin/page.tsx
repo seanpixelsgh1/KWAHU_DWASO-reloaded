@@ -3,8 +3,8 @@ import Logo from "@/components/Logo";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Sign In | Shofy",
-  description: "Sign in to your Shofy account",
+  title: "Sign In | Kwahu Dwaso",
+  description: "Sign in to your Kwahu Dwaso account",
 };
 
 export default function SignInPage() {

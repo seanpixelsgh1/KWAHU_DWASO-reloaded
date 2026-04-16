@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Delivery Dashboard - Shofy",
+  title: "Delivery Dashboard - Kwahu Dwaso",
   description:
     "Delivery management dashboard for tracking and updating deliveries",
 };

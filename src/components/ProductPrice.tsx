@@ -8,7 +8,7 @@ const ProductPrice = ({ regularPrice, discountedPrice, product }: any) => {
   const [existingProduct, setExistingProduct] = useState<ProductType | null>(
     null
   );
-  const { cart } = useSelector((state: StateType) => state?.shopy);
+  const { cart } = useSelector((state: StateType) => state?.kwahudwaso);
   useEffect(() => {
     const availableProduct = cart?.find((item) => item?.id === product?.id);
     if (availableProduct) {

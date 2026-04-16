@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { AdminTableSkeleton } from "./AdminSkeletons";
 import { toast } from "react-hot-toast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { formatDisplayName } from "@/lib/utils/user";
 import {
   FiPackage,
   FiX,
@@ -292,7 +293,7 @@ export default function AdminOrdersClient() {
             .toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
           order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (order.customerName || order.userName || "")
+        (formatDisplayName(order.customerName || order.userName, ""))
             .toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
           (order.customerEmail || order.userEmail || "")
@@ -653,7 +654,7 @@ export default function AdminOrdersClient() {
                 <td className="px-3 py-4 whitespace-nowrap">
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-gray-900 truncate">
-                      {order.customerName || "No Name"}
+                      {formatDisplayName(order.customerName || order.userName, "Guest")}
                     </div>
                     <div className="text-xs text-gray-500 truncate">
                       {order.customerEmail}
@@ -882,7 +883,7 @@ export default function AdminOrdersClient() {
                       Customer
                     </dt>
                     <dd className="text-sm text-gray-900">
-                      {viewOrderModal.customerName}
+                      {formatDisplayName(viewOrderModal.customerName || viewOrderModal.userName, "Guest")}
                     </dd>
                   </div>
                   <div>

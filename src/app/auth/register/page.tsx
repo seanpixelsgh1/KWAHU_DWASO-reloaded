@@ -3,8 +3,8 @@ import Logo from "@/components/Logo";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Register | Shofy",
-  description: "Create your Shofy account",
+  title: "Register | Kwahu Dwaso",
+  description: "Create your Kwahu Dwaso account",
 };
 
 export default function RegisterPage() {
@@ -17,7 +17,7 @@ export default function RegisterPage() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Create Account</h1>
           <p className="mt-2 text-sm text-gray-600">
-            Join Shofy today and start shopping!
+            Join Kwahu Dwaso today and start shopping!
           </p>
         </div>
       </div>

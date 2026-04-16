@@ -120,7 +120,7 @@ export default function AdminDashboardClient() {
             <FiDollarSign className="h-6 w-6 text-emerald-600" />
           </div>
           <div className="text-2xl font-bold text-gray-900">
-            ${(stats?.totalRevenue || 0).toFixed(2)}
+            GH₵{(stats?.totalRevenue || 0).toFixed(2)}
           </div>
           <p className="text-xs text-gray-500 mt-1">Total earnings</p>
         </div>

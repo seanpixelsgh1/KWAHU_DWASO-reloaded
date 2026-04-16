@@ -4,8 +4,8 @@ import Footer from "@/components/Footer";
 import Layout from "@/components/layout/Layout";
 
 export const metadata: Metadata = {
-  title: "Shofy - Information Pages",
-  description: "Shofy information pages - About, Contact, Inquiry, and FAQs",
+  title: "Kwahu Dwaso - Information Pages",
+  description: "Kwahu Dwaso information pages - About, Contact, Inquiry, and FAQs",
 };
 
 export default function PublicLayout({

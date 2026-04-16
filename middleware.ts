@@ -18,6 +18,9 @@ import { NextResponse } from "next/server";
 import { auth } from "./auth";
 import { checkRouteAccess } from "@/lib/rbac/middleware";
 import { UserRole, getDefaultDashboardRoute } from "@/lib/rbac/roles";
+import { FORCE_PREMIUM } from "@/lib/constants/admin";
+
+const isDev = process.env.NODE_ENV === "development";
 
 const protectedRoutes = [
   "/account",
@@ -35,6 +38,11 @@ const authRoutes = ["/auth/signin", "/auth/register"];
 export async function middleware(request: any) {
   const { pathname } = request.nextUrl;
   const session = await auth();
+
+  // God Mode Override (Middleware Level)
+  if (FORCE_PREMIUM && isDev) {
+    return NextResponse.next();
+  }
 
   // Restrict protected routes to logged-in users
   if (protectedRoutes.some((route) => pathname.startsWith(route))) {

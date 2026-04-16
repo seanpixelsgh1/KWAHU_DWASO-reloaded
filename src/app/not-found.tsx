@@ -7,7 +7,7 @@ import { Metadata } from "next";
 import NotFoundClient from "@/components/not-found/NotFoundClient";
 
 export const metadata: Metadata = {
-  title: "Page Not Found | Shofy",
+  title: "Page Not Found | Kwahu Dwaso",
   description:
     "The page you're looking for doesn't exist. Return to our homepage or browse our products.",
 };
@@ -81,8 +81,8 @@ export default function GlobalNotFound() {
               help with orders, products, or account issues.
             </p>
             <div className="space-y-2">
-              <p className="text-green-600 font-medium">📧 support@shofy.com</p>
-              <p className="text-green-600 font-medium">� +1 (555) 123-4567</p>
+              <p className="text-green-600 font-medium">📧 info@kwahudwaso.com</p>
+              <p className="text-green-600 font-medium">📞 (+233 557704585)</p>
             </div>
           </div>
         </div>

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "About Us - Shofy",
+  title: "About Us - Kwahu Dwaso",
   description:
-    "Learn more about Shofy - Your trusted multipurpose eCommerce platform",
+    "Learn more about Kwahu Dwaso - Your trusted multipurpose eCommerce platform",
 };
 
 export default function AboutPage() {
@@ -16,7 +16,7 @@ export default function AboutPage() {
         {/* Header Section */}
         <div className="text-center mb-12">
           <Title className="text-3xl lg:text-4xl font-bold mb-4">
-            About Shofy
+            About Kwahu Dwaso
           </Title>
           <p className="text-light-text text-lg">
             Your trusted multipurpose eCommerce platform for quality products
@@ -31,7 +31,7 @@ export default function AboutPage() {
               Our Story
             </h2>
             <p className="text-light-text leading-relaxed mb-4">
-              Founded in 2024, Shofy has emerged as a leading multipurpose
+              Founded in 2024, Kwahu Dwaso has emerged as a leading multipurpose
               eCommerce platform dedicated to providing customers with
               high-quality products and exceptional shopping experiences. We
               believe that online shopping should be simple, secure, and
@@ -121,7 +121,7 @@ export default function AboutPage() {
               Our Team
             </h2>
             <p className="text-light-text leading-relaxed mb-4">
-              Behind Shofy is a passionate team of designers, developers, and
+              Behind Kwahu Dwaso is a passionate team of designers, developers, and
               customer service professionals who work tirelessly to improve your
               shopping experience. We are committed to innovation, quality, and
               customer satisfaction.
@@ -140,7 +140,7 @@ export default function AboutPage() {
               Ready to Shop?
             </h2>
             <p className="text-light-text mb-6">
-              Explore our wide range of products and experience the Shofy
+              Explore our wide range of products and experience the Kwahu Dwaso
               difference today.
             </p>
             <Link
