@@ -12,6 +12,8 @@ export async function POST(request: NextRequest) {
 
     const { orderId, reference } = await request.json();
 
+    console.log("Incoming:", { orderId, reference });
+
     if (!orderId || !reference) {
       return NextResponse.json(
         { error: "Order ID and reference are required" },
@@ -55,6 +57,7 @@ export async function POST(request: NextRequest) {
     });
 
     const paystackData = await paystackResponse.json();
+    console.log("Paystack response:", paystackData);
 
     // Validate Response (STRICT)
     if (!paystackResponse.ok || paystackData.data?.status !== "success") {
@@ -66,6 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update status and paymentStatus ONLY AFTER VERIFICATION
+    console.log("Updating order:", orderId);
     await orderRef.update({
       status: "confirmed",
       paymentStatus: "paid",

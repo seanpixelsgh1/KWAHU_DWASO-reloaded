@@ -24,6 +24,9 @@ const SuccessPage = () => {
   const [attempts, setAttempts] = useState(0);
   const [isTimeout, setIsTimeout] = useState(false);
 
+  console.log("ORDER ID:", orderId);
+  console.log("REFERENCE:", reference);
+
   !orderId && redirect("/");
 
   useEffect(() => {
