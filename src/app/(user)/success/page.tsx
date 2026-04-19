@@ -31,12 +31,6 @@ const SuccessPage = () => {
   console.log("ORDER ID:", orderId);
   console.log("REFERENCE:", reference);
 
-  // Hard guard
-  if (!orderId || !reference) {
-    console.error("Missing payment params", { orderId, reference });
-    return;
-  }
-
   useEffect(() => {
     if (!orderId || !reference || !session?.user?.email || orderProcessed || isTimeout) return;
 
@@ -81,6 +75,12 @@ const SuccessPage = () => {
 
     return () => clearInterval(pollInterval);
   }, [orderId, reference, session?.user?.email, orderProcessed, isTimeout, attempts, dispatch]);
+
+  // Hard guard
+  if (!orderId || !reference) {
+    console.error("Missing payment params", { orderId, reference });
+    return null;
+  }
 
   return (
     <ProtectedRoute loadingMessage="Checking your order...">
