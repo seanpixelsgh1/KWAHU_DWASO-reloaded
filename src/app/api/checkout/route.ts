@@ -53,8 +53,9 @@ export const POST = async (request: NextRequest) => {
       throw new Error("Paystack secret key is missing");
     }
 
-    const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const callbackUrl = `${baseUrl}/success?order_id=${finalOrderId}`;
+    console.log("Paystack callback_url:", callbackUrl);
 
     const paystackPayload = {
       email: email,

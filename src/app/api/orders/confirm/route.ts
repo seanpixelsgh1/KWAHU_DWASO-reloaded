@@ -10,13 +10,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { orderId, reference } = await request.json();
+    const body = await request.json();
+
+    const orderId = body.orderId;
+    const reference = body.reference || body.trxref;
 
     console.log("Incoming:", { orderId, reference });
 
     if (!orderId || !reference) {
       return NextResponse.json(
-        { error: "Order ID and reference are required" },
+        { success: false, message: "Missing params" },
         { status: 400 }
       );
     }

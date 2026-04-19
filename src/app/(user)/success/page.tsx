@@ -15,8 +15,6 @@ import { FiClock, FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 
 const SuccessPage = () => {
   const searchParams = useSearchParams();
-  const orderId = searchParams.get("order_id");
-  const reference = searchParams.get("reference");
   const dispatch = useDispatch();
   const { data: session } = useSession();
   const [orderProcessed, setOrderProcessed] = useState(false);
@@ -24,10 +22,20 @@ const SuccessPage = () => {
   const [attempts, setAttempts] = useState(0);
   const [isTimeout, setIsTimeout] = useState(false);
 
+  const orderId = searchParams.get("order_id");
+
+  // Paystack sometimes returns trxref instead of reference
+  const reference =
+    searchParams.get("reference") || searchParams.get("trxref");
+
   console.log("ORDER ID:", orderId);
   console.log("REFERENCE:", reference);
 
-  !orderId && redirect("/");
+  // Hard guard
+  if (!orderId || !reference) {
+    console.error("Missing payment params", { orderId, reference });
+    return;
+  }
 
   useEffect(() => {
     if (!orderId || !reference || !session?.user?.email || orderProcessed || isTimeout) return;
