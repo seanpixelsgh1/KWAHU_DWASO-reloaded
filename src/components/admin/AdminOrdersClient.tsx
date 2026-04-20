@@ -177,21 +177,9 @@ export default function AdminOrdersClient() {
       // Handle different response formats
       if (data.orders) {
         setOrders(data.orders);
-      } else if (data.users) {
-        // Extract orders from users for admin endpoint
-        const allOrders: Order[] = [];
-        data.users.forEach((user: any) => {
-          if (user.orders && Array.isArray(user.orders)) {
-            user.orders.forEach((order: any) => {
-              allOrders.push({
-                ...order,
-                userEmail: user.email,
-                userName: user.name,
-              });
-            });
-          }
-        });
-        setOrders(allOrders);
+      } else if (data.standaloneOrders) {
+        setOrders(data.standaloneOrders);
+        console.log("Admin Orders Loaded:", data.standaloneOrders.length);
       } else {
         setOrders([]);
       }
