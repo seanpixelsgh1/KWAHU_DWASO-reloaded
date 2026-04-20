@@ -275,33 +275,34 @@ export default function AdminOrdersClient() {
 
     // Search filter
     if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (order) =>
-          (order.orderId || order.id)
+          (order.orderId || order.id || "")
             .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (formatDisplayName(order.customerName || order.userName, ""))
+            .includes(searchLower) ||
+          (order.id || "").toLowerCase().includes(searchLower) ||
+          (formatDisplayName(order.customerName || order.userName, ""))
             .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
+            .includes(searchLower) ||
           (order.customerEmail || order.userEmail || "")
             .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          order.trackingNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+            .includes(searchLower) ||
+          (order.trackingNumber || "").toLowerCase().includes(searchLower)
       );
     }
 
     // Status filter
     if (statusFilter !== "all") {
       filtered = filtered.filter(
-        (order) => order.status.toLowerCase() === statusFilter
+        (order) => (order.status || "").toLowerCase() === statusFilter
       );
     }
 
     // Payment status filter
     if (paymentFilter !== "all") {
       filtered = filtered.filter(
-        (order) => order.paymentStatus.toLowerCase() === paymentFilter
+        (order) => (order.paymentStatus || "").toLowerCase() === paymentFilter
       );
     }
 
