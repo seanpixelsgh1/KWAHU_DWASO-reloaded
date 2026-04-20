@@ -21,7 +21,8 @@ interface Props {
   fromCurrency?: CurrencyCode;
 }
 
-const PriceFormat = ({ amount, className, fromCurrency = "USD" }: Props) => {
+const PriceFormat = ({ amount, className, fromCurrency = "GHS" }: Props) => {
+  console.log("PriceFormat input:", amount, "from:", fromCurrency);
   const { selectedCurrency, convertPrice } = useCurrency();
 
   if (!amount)

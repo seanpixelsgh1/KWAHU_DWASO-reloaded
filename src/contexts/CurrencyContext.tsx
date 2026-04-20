@@ -81,7 +81,7 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const convertPrice = (
     amount: number,
-    fromCurrency: CurrencyCode = "USD"
+    fromCurrency: CurrencyCode = "GHS"
   ): number => {
     if (fromCurrency === selectedCurrency) return amount;
 
