@@ -27,7 +27,7 @@ export async function GET() {
 
     // Calculate real stats
     const totalRevenue = orders.reduce(
-      (sum, order) => sum + (Number(order.total) || 0),
+      (sum, order) => sum + (Number(order.amount) || Number(order.total) || 0),
       0
     );
     const pendingOrders = orders.filter(

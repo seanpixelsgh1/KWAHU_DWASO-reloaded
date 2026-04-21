@@ -40,7 +40,8 @@ export default function AdminAnalyticsClient() {
       const response = await fetch("/api/admin/analytics");
       if (response.ok) {
         const data = await response.json();
-        setAnalytics(data);
+        console.log("Analytics API Response:", data);
+        setAnalytics(data.data);
       }
     } catch (error) {
       console.error("Error fetching analytics:", error);
