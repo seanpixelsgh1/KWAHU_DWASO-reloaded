@@ -31,7 +31,10 @@ export const POST = async (request: NextRequest) => {
       orderId: finalOrderId,
       userId,
       email,
+      customerEmail: email,
       amount: total,
+      total: total, // backward compatibility alias
+      currency: "GHS",
       items: items || [],
       status: "pending",
       paymentStatus: "pending",

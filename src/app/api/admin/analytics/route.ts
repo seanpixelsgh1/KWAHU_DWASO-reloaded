@@ -92,9 +92,12 @@ export async function GET(request: NextRequest) {
       status: order.status || "pending",
     }));
 
-    // Calculate totals
-    const totalRevenue = orders.reduce(
-      (sum: number, order: any) => sum + (order.amount || 0),
+    // Calculate totals (only count paid orders as revenue)
+    const paidOrders = orders.filter(
+      (o: any) => (o.paymentStatus || "").toLowerCase() === "paid"
+    );
+    const totalRevenue = paidOrders.reduce(
+      (sum: number, order: any) => sum + (order.amount || order.total || 0),
       0
     );
     const totalOrders = orders.length;
@@ -138,26 +141,24 @@ export async function GET(request: NextRequest) {
         : 0;
 
     return NextResponse.json({
-      success: true,
-      data: {
-        overview: {
-          totalRevenue: Math.round(totalRevenue),
-          totalOrders,
-          monthlyRevenue: Math.round(thisMonthRevenue),
-          monthlyOrders: thisMonthOrders.length,
-          revenueGrowth: Math.round(revenueGrowth * 100) / 100,
-          orderGrowth: Math.round(orderGrowth * 100) / 100,
-        },
-        monthlyRevenue,
-        statusDistribution: Object.entries(statusDistribution).map(
-          ([status, count]) => ({
-            status,
-            count: count as number,
-            percentage: Math.round(((count as number) / totalOrders) * 100),
-          })
-        ),
-        recentActivity,
+      overview: {
+        totalRevenue: Math.round(totalRevenue),
+        totalOrders,
+        totalPaidOrders: paidOrders.length,
+        monthlyRevenue: Math.round(thisMonthRevenue),
+        monthlyOrders: thisMonthOrders.length,
+        revenueGrowth: Math.round(revenueGrowth * 100) / 100,
+        orderGrowth: Math.round(orderGrowth * 100) / 100,
       },
+      monthlyRevenue,
+      statusDistribution: Object.entries(statusDistribution).map(
+        ([status, count]) => ({
+          status,
+          count: count as number,
+          percentage: Math.round(((count as number) / totalOrders) * 100),
+        })
+      ),
+      recentActivity,
     });
   } catch (error) {
     console.error("API ERROR [admin-analytics-get]:", error);

@@ -27,7 +27,7 @@ interface AnalyticsData {
   overview: OverviewData;
   monthlyRevenue: Array<{ month: string; revenue: number }>;
   topProducts: Array<{ name: string; sales: number; revenue: number }>;
-  ordersByStatus: Array<{ status: string; count: number; percentage: number }>;
+  statusDistribution: Array<{ status: string; count: number; percentage: number }>;
 }
 
 export default function AdminAnalyticsClient() {
@@ -45,8 +45,11 @@ export default function AdminAnalyticsClient() {
       if (response.ok) {
         const data = await response.json();
         console.log("Analytics API Response:", data);
-        setAnalytics(data.data);
-        console.log("Analytics State:", data.data);
+        if (!data?.overview) {
+          console.error("Invalid analytics shape — missing overview:", data);
+        }
+        setAnalytics(data);
+        console.log("Analytics State:", data);
       }
     } catch (error) {
       console.error("Error fetching analytics:", error);
@@ -211,7 +214,7 @@ export default function AdminAnalyticsClient() {
             <FiBarChart className="h-5 w-5 text-gray-400" />
           </div>
           <div className="space-y-3">
-            {(analytics.ordersByStatus ?? []).map((item, index) => {
+            {(analytics.statusDistribution ?? []).map((item, index) => {
               const colors = [
                 "bg-yellow-500",
                 "bg-blue-500",

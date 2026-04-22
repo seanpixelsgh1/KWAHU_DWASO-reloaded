@@ -157,6 +157,18 @@ export default function AdminOrdersClient() {
     }
   };
 
+  // Normalize raw order data to prevent UI crashes from missing fields
+  const normalizeOrders = (rawOrders: any[]): Order[] =>
+    rawOrders.map((order: any) => ({
+      ...order,
+      amount: order.amount || order.total || 0,
+      status: order.status || "pending",
+      paymentStatus: order.paymentStatus || "pending",
+      paymentMethod: order.paymentMethod || "unknown",
+      userEmail: order.userEmail || order.customerEmail || order.email || "",
+      customerEmail: order.customerEmail || order.userEmail || order.email || "",
+    }));
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -174,12 +186,13 @@ export default function AdminOrdersClient() {
 
       const data = await response.json();
 
-      // Handle different response formats
+      // Handle different response formats + normalize
       if (data.orders) {
-        setOrders(data.orders);
+        setOrders(normalizeOrders(data.orders));
       } else if (data.standaloneOrders) {
-        setOrders(data.standaloneOrders);
-        console.log("Admin Orders Loaded:", data.standaloneOrders.length);
+        const normalized = normalizeOrders(data.standaloneOrders);
+        setOrders(normalized);
+        console.log("Admin Orders Loaded:", normalized.length);
       } else {
         setOrders([]);
       }
