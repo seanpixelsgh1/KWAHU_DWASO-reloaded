@@ -13,7 +13,7 @@ import {
   FiBarChart,
 } from "react-icons/fi";
 
-interface AnalyticsData {
+interface OverviewData {
   totalRevenue: number;
   totalOrders: number;
   totalUsers: number;
@@ -21,6 +21,10 @@ interface AnalyticsData {
   revenueGrowth: number;
   ordersGrowth: number;
   usersGrowth: number;
+}
+
+interface AnalyticsData {
+  overview: OverviewData;
   monthlyRevenue: Array<{ month: string; revenue: number }>;
   topProducts: Array<{ name: string; sales: number; revenue: number }>;
   ordersByStatus: Array<{ status: string; count: number; percentage: number }>;
@@ -42,6 +46,7 @@ export default function AdminAnalyticsClient() {
         const data = await response.json();
         console.log("Analytics API Response:", data);
         setAnalytics(data.data);
+        console.log("Analytics State:", data.data);
       }
     } catch (error) {
       console.error("Error fetching analytics:", error);
@@ -72,34 +77,36 @@ export default function AdminAnalyticsClient() {
     );
   }
 
+  const overview = analytics?.overview;
+
   const stats = [
     {
       title: "Total Revenue",
-      value: `GH₵${(analytics.totalRevenue ?? 0).toFixed(2)}`,
-      change: analytics.revenueGrowth ?? 0,
+      value: `GH₵${(overview?.totalRevenue ?? 0).toFixed(2)}`,
+      change: overview?.revenueGrowth ?? 0,
       icon: FiDollarSign,
       color: "text-green-600",
       bgColor: "bg-green-100",
     },
     {
       title: "Total Orders",
-      value: (analytics.totalOrders ?? 0).toString(),
-      change: analytics.ordersGrowth ?? 0,
+      value: (overview?.totalOrders ?? 0).toString(),
+      change: overview?.ordersGrowth ?? 0,
       icon: FiShoppingCart,
       color: "text-blue-600",
       bgColor: "bg-blue-100",
     },
     {
       title: "Total Users",
-      value: (analytics.totalUsers ?? 0).toString(),
-      change: analytics.usersGrowth ?? 0,
+      value: (overview?.totalUsers ?? 0).toString(),
+      change: overview?.usersGrowth ?? 0,
       icon: FiUsers,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
     },
     {
       title: "Average Order",
-      value: `GH₵${(analytics.averageOrderValue ?? 0).toFixed(2)}`,
+      value: `GH₵${(overview?.averageOrderValue ?? 0).toFixed(2)}`,
       change: 0,
       icon: FiPackage,
       color: "text-orange-600",
