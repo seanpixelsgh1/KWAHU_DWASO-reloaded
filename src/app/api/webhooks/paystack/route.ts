@@ -1,82 +1,104 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
 import crypto from "crypto";
+import { FieldValue } from "firebase-admin/firestore";
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    // 1. Accept POST request & Read raw body for signature verification
-    const rawBody = await request.text();
-    const signature = request.headers.get("x-paystack-signature");
+    // 1. Read Raw Body
+    const rawBody = await req.text();
 
-    // Do NOT trust frontend - Secure the webhook via HMAC SHA512 signature verify
+    // 2. Verify Paystack Signature
     const secret = process.env.PAYSTACK_SECRET_KEY;
-    if (secret && signature) {
-      const hash = crypto.createHmac("sha512", secret).update(rawBody).digest("hex");
-      if (hash !== signature) {
-        console.error("Paystack Webhook: Invalid Signature");
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!secret) {
+      console.error("PAYSTACK_SECRET_KEY is missing");
+      return new Response("Server error", { status: 500 });
+    }
+
+    const signature = req.headers.get("x-paystack-signature");
+    if (!signature) {
+      return new Response("Missing signature", { status: 401 });
+    }
+
+    const hash = crypto
+      .createHmac("sha512", secret)
+      .update(rawBody)
+      .digest("hex");
+
+    if (hash !== signature) {
+      console.error("Paystack Webhook: Invalid Signature");
+      return new Response("Invalid signature", { status: 401 });
+    }
+
+    // 3. Parse Event
+    const event = JSON.parse(rawBody);
+
+    // 4. Handle Successful Payment
+    if (event.event === "charge.success") {
+      // 5. Extract Data
+      const data = event.data;
+      const reference = data.reference;
+      
+      // Amount in Paystack is usually in the lowest denomination (pesewas), so if we want to log it
+      const amount = data.amount / 100; // convert from pesewas/kobo -> GHS
+      const email = data.customer.email;
+
+      // 6. Find Order in Firestore
+      const orderQuery = await db
+        .collection("orders")
+        .where("paymentReference", "==", reference)
+        .limit(1)
+        .get();
+
+      if (orderQuery.empty) {
+        console.error("Order not found for reference:", reference);
+        return new Response("Order not found", { status: 404 });
+      }
+
+      const orderDoc = orderQuery.docs[0];
+
+      // 7. Idempotency Protection
+      const orderData = orderDoc.data();
+
+      if (orderData.paymentStatus === "paid") {
+        return new Response("Already processed", { status: 200 });
+      }
+
+      // 8. Update Order
+      await orderDoc.ref.update({
+        paymentStatus: "paid",
+        status: "processing",
+        paidAt: FieldValue.serverTimestamp(),
+        paymentMethod: "paystack",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      
+    } else if (event.event === "charge.failed") {
+      // 9. Handle Failed Payments (Optional)
+      const data = event.data;
+      const reference = data.reference;
+
+      const orderQuery = await db
+        .collection("orders")
+        .where("paymentReference", "==", reference)
+        .limit(1)
+        .get();
+
+      if (!orderQuery.empty) {
+        const orderDoc = orderQuery.docs[0];
+        
+        await orderDoc.ref.update({
+          paymentStatus: "failed",
+          status: "pending", // Or some failed status
+          updatedAt: FieldValue.serverTimestamp(),
+        });
       }
     }
 
-    const body = JSON.parse(rawBody);
-    
-    // 2. Extract event
-    const event = body.event;
-
-    // 3. Handle ONLY "charge.success"
-    if (event !== "charge.success") {
-      return NextResponse.json({ message: "Event ignored" }, { status: 200 });
-    }
-
-    const data = body.data;
-    
-    // 4. Extract reference
-    const reference = data.reference;
-
-    if (!reference) {
-      return NextResponse.json({ error: "Missing reference" }, { status: 400 });
-    }
-
-    // 5. Fetch order using the reference (which maps to our doc.id)
-    const orderRef = db.collection("orders").doc(reference);
-    const orderDoc = await orderRef.get();
-
-    // 6. If not found -> return 404
-    if (!orderDoc.exists) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    }
-
-    const orderData = orderDoc.data();
-
-    // 7. Idempotency check
-    if (orderData?.paymentStatus === "paid") {
-      return NextResponse.json({ message: "Order already paid" }, { status: 200 });
-    }
-
-    // 8. Verify amount matches (Paystack sends amount in lowest currency unit - pesewas/kobo)
-    const expectedAmount = Math.round((orderData?.amount || 0) * 100);
-    if (data.amount !== expectedAmount) {
-      console.error(`Paystack Webhook: Amount Mismatch. Expected ${expectedAmount}, got ${data.amount}`);
-      return NextResponse.json({ error: "Amount mismatch. Transaction rejected." }, { status: 400 });
-    }
-
-    // 9. Update order
-    await orderRef.update({
-      paymentStatus: "paid",
-      status: "confirmed",
-      paidAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-
-    // 10. Return 200 OK
-    return NextResponse.json({ message: "Webhook processed successfully" }, { status: 200 });
-
-  } catch (error: any) {
+    // 10. Final Response
+    return new Response("Webhook processed", { status: 200 });
+  } catch (error) {
     console.error("WEBHOOK ERROR [paystack]:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return new Response("Internal server error", { status: 500 });
   }
 }
