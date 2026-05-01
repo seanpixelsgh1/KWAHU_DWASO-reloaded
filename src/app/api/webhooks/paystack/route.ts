@@ -2,6 +2,125 @@ import { NextRequest } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
 import crypto from "crypto";
 import { FieldValue } from "firebase-admin/firestore";
+import { confirmInventory, releaseInventory } from "@/lib/inventory";
+
+async function processWebhookEvent(event: any) {
+  try {
+    // 4. Handle Successful Payment
+    if (event.event === "charge.success") {
+      const data = event.data;
+      const reference = data.reference;
+
+      // 5. Find Order in Firestore
+      const orderQuery = await db
+        .collection("orders")
+        .where("paymentReference", "==", reference)
+        .limit(1)
+        .get();
+
+      if (orderQuery.empty) {
+        console.error("Order not found for reference:", reference);
+        return;
+      }
+
+      const orderDoc = orderQuery.docs[0];
+      const orderData = orderDoc.data();
+
+      // 6. Idempotency Protection
+      if (orderData.paymentStatus === "paid") {
+        console.log("Already processed", { orderId: orderDoc.id, reference });
+        return;
+      }
+
+      // Reference Ownership Check
+      if (orderData.paymentReference !== data.reference) {
+        console.error("Validation failed", {
+          type: "reference_mismatch",
+          orderId: orderDoc.id,
+          expectedReference: orderData.paymentReference,
+          receivedReference: data.reference,
+        });
+        return;
+      }
+
+      // 7. Amount Validation (Anti-Tamper)
+      const expectedAmount = Math.round(orderData.amount * 100);
+      if (data.amount !== expectedAmount) {
+        console.error("Validation failed", {
+          type: "amount_mismatch",
+          orderId: orderDoc.id,
+          reference: data.reference,
+          expected: expectedAmount,
+          received: data.amount,
+        });
+        return;
+      }
+
+      // Currency Validation
+      if (data.currency?.toUpperCase() !== orderData.currency?.toUpperCase()) {
+        console.error("Validation failed", {
+          type: "currency_mismatch",
+          orderId: orderDoc.id,
+          reference: data.reference,
+          expected: orderData.currency,
+          received: data.currency,
+        });
+        return;
+      }
+
+      // Email Validation
+      if (data.customer?.email?.toLowerCase() !== orderData.email?.toLowerCase()) {
+        console.error("Validation failed", {
+          type: "email_mismatch",
+          orderId: orderDoc.id,
+          reference: data.reference,
+          expected: orderData.email,
+          received: data.customer?.email,
+        });
+        return;
+      }
+
+      // ─────────────────────────────────────────────
+      // 8. ATOMIC: Convert reservation → real stock deduction + mark paid
+      // ─────────────────────────────────────────────
+      await confirmInventory(orderDoc.ref, data);
+
+      // 9. Add Payment Audit Log
+      await orderDoc.ref.collection("logs").add({
+        event: "payment_verified",
+        payload: data,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+    } else if (event.event === "charge.failed") {
+      // ─────────────────────────────────────────────
+      // 10. ROLLBACK: Release reserved stock on payment failure
+      // ─────────────────────────────────────────────
+      const data = event.data;
+      const reference = data.reference;
+
+      const orderQuery = await db
+        .collection("orders")
+        .where("paymentReference", "==", reference)
+        .limit(1)
+        .get();
+
+      if (!orderQuery.empty) {
+        const orderDoc = orderQuery.docs[0];
+        await releaseInventory(orderDoc.ref);
+
+        // Audit log for failed payment
+        await orderDoc.ref.collection("logs").add({
+          event: "payment_failed",
+          payload: data,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
+    }
+  } catch (error) {
+    console.error("WEBHOOK ERROR [processWebhookEvent]:", error);
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,70 +152,11 @@ export async function POST(req: NextRequest) {
     // 3. Parse Event
     const event = JSON.parse(rawBody);
 
-    // 4. Handle Successful Payment
-    if (event.event === "charge.success") {
-      // 5. Extract Data
-      const data = event.data;
-      const reference = data.reference;
-      
-      // Amount in Paystack is usually in the lowest denomination (pesewas), so if we want to log it
-      const amount = data.amount / 100; // convert from pesewas/kobo -> GHS
-      const email = data.customer.email;
+    // 4. Background Processing
+    processWebhookEvent(event).catch(console.error);
 
-      // 6. Find Order in Firestore
-      const orderQuery = await db
-        .collection("orders")
-        .where("paymentReference", "==", reference)
-        .limit(1)
-        .get();
-
-      if (orderQuery.empty) {
-        console.error("Order not found for reference:", reference);
-        return new Response("Order not found", { status: 404 });
-      }
-
-      const orderDoc = orderQuery.docs[0];
-
-      // 7. Idempotency Protection
-      const orderData = orderDoc.data();
-
-      if (orderData.paymentStatus === "paid") {
-        return new Response("Already processed", { status: 200 });
-      }
-
-      // 8. Update Order
-      await orderDoc.ref.update({
-        paymentStatus: "paid",
-        status: "processing",
-        paidAt: FieldValue.serverTimestamp(),
-        paymentMethod: "paystack",
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      
-    } else if (event.event === "charge.failed") {
-      // 9. Handle Failed Payments (Optional)
-      const data = event.data;
-      const reference = data.reference;
-
-      const orderQuery = await db
-        .collection("orders")
-        .where("paymentReference", "==", reference)
-        .limit(1)
-        .get();
-
-      if (!orderQuery.empty) {
-        const orderDoc = orderQuery.docs[0];
-        
-        await orderDoc.ref.update({
-          paymentStatus: "failed",
-          status: "pending", // Or some failed status
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
-    }
-
-    // 10. Final Response
-    return new Response("Webhook processed", { status: 200 });
+    // Immediately return 200 to acknowledge webhook
+    return new Response("Webhook received", { status: 200 });
   } catch (error) {
     console.error("WEBHOOK ERROR [paystack]:", error);
     return new Response("Internal server error", { status: 500 });

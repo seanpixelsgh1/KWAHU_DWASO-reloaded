@@ -6,80 +6,110 @@ import PriceFormat from "@/components/PriceFormat";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { resetCart } from "@/redux/shofySlice";
 import Link from "next/link";
-import { redirect, useSearchParams } from "next/navigation";
-import React, { useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import { useSearchParams, useRouter } from "next/navigation";
+import React, { useEffect, useState, useRef } from "react";
 import { useDispatch } from "react-redux";
-import { useSession } from "next-auth/react";
 import { FiClock, FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 
 const SuccessPage = () => {
   const searchParams = useSearchParams();
   const dispatch = useDispatch();
-  const { data: session } = useSession();
-  const [orderProcessed, setOrderProcessed] = useState(false);
+  const router = useRouter();
+  
+  const [paymentStatus, setPaymentStatus] = useState("pending");
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [attempts, setAttempts] = useState(0);
   const [isTimeout, setIsTimeout] = useState(false);
+  const hasReconciled = useRef(false);
 
   const orderId = searchParams.get("order_id");
 
-  // Paystack sometimes returns trxref instead of reference
-  const reference =
-    searchParams.get("reference") || searchParams.get("trxref");
-
-  console.log("ORDER ID:", orderId);
-  console.log("REFERENCE:", reference);
-
   useEffect(() => {
-    if (!orderId || !reference || !session?.user?.email || orderProcessed || isTimeout) return;
+    if (!orderId) {
+      router.push("/cart");
+      return;
+    }
 
-    const confirmOrderPayment = async () => {
+    const runFallback = async () => {
       try {
-        setAttempts((prev) => prev + 1);
-        const response = await fetch('/api/orders/confirm', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            orderId,
-            reference
-          })
-        });
-
-        if (!response.ok) return;
-
-        const data = await response.json();
+        const fallbackRes = await fetch(`/api/paystack/verify?orderId=${orderId}`);
+        const fallbackData = await fallbackRes.json();
         
-        if (data.success && data.order) {
-          toast.success("Payment confirmed successfully!");
-          setOrderProcessed(true);
-          setOrderDetails(data.order);
+        if (fallbackData.paymentStatus === "paid") {
+          setPaymentStatus("paid");
+          const finalOrderRes = await fetch(`/api/orders/${orderId}`);
+          const finalOrder = await finalOrderRes.json();
+          setOrderDetails({
+            id: finalOrder.orderId,
+            amount: finalOrder.amount,
+          });
           dispatch(resetCart());
+          return true;
+        } else {
+          return false;
         }
       } catch (error) {
-        console.error("Error confirming order status:", error);
+        console.error("Fallback failed", error);
+        return false;
       }
     };
 
-    const pollInterval = setInterval(() => {
-      confirmOrderPayment();
-    }, 4000); // 4 seconds
+    const fetchOrderStatus = async () => {
+      try {
+        setAttempts((prev) => prev + 1);
+        const res = await fetch(`/api/orders/${orderId}`);
+        const data = await res.json();
+        return data;
+      } catch (error) {
+        console.error("Error fetching order status:", error);
+        return null;
+      }
+    };
 
-    // 60-second timeout (15 attempts)
-    if (attempts >= 15) {
-      clearInterval(pollInterval);
-      setIsTimeout(true);
+    if (paymentStatus === "paid" || paymentStatus === "failed" || isTimeout) return;
+
+    // Status reconciliation on page load
+    if (!hasReconciled.current) {
+      hasReconciled.current = true;
+      fetchOrderStatus().then((data) => {
+        if (data && data.paymentStatus !== "paid" && data.paymentStatus !== "failed") {
+          // Immediately trigger fallback verification API
+          runFallback().catch(console.error);
+        }
+      });
     }
 
-    return () => clearInterval(pollInterval);
-  }, [orderId, reference, session?.user?.email, orderProcessed, isTimeout, attempts, dispatch]);
+    // 60-second timeout (20 attempts)
+    if (attempts >= 20) {
+      runFallback().then((success) => {
+        if (!success) setIsTimeout(true);
+      });
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      const orderData = await fetchOrderStatus();
+
+      if (orderData?.paymentStatus === "paid") {
+        setPaymentStatus("paid");
+        setOrderDetails({
+          id: orderData.orderId,
+          amount: orderData.amount,
+        });
+        dispatch(resetCart());
+        clearInterval(interval);
+      } else if (orderData?.paymentStatus === "failed") {
+        setPaymentStatus("failed");
+        clearInterval(interval);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [orderId, paymentStatus, isTimeout, attempts, dispatch, router]);
 
   // Hard guard
-  if (!orderId || !reference) {
-    console.error("Missing payment params", { orderId, reference });
-    return null;
+  if (!orderId) {
+    return null; // Will redirect in useEffect
   }
 
   return (
@@ -90,10 +120,12 @@ const SuccessPage = () => {
           {/* Header Icon */}
           <div className="mb-8">
             <div className={`w-20 h-20 rounded-full flex items-center justify-center ${
-              orderProcessed ? 'bg-green-100' : isTimeout ? 'bg-yellow-100' : 'bg-blue-100'
+              paymentStatus === "paid" ? 'bg-green-100' : paymentStatus === "failed" ? 'bg-red-100' : isTimeout ? 'bg-yellow-100' : 'bg-blue-100'
             }`}>
-              {orderProcessed ? (
+              {paymentStatus === "paid" ? (
                 <FiCheckCircle className="w-10 h-10 text-green-600" />
+              ) : paymentStatus === "failed" ? (
+                <FiAlertCircle className="w-10 h-10 text-red-600" />
               ) : isTimeout ? (
                 <FiAlertCircle className="w-10 h-10 text-yellow-600" />
               ) : (
@@ -105,29 +137,33 @@ const SuccessPage = () => {
           {/* Message */}
           <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              {orderProcessed 
+              {paymentStatus === "paid"
                 ? "🎉 Payment Successful!" 
-                : isTimeout 
-                  ? "We're almost there..." 
-                  : "Payment received. Waiting for confirmation..."}
+                : paymentStatus === "failed"
+                  ? "Payment Failed"
+                  : isTimeout 
+                    ? "We're almost there..." 
+                    : "Verifying payment..."}
             </h1>
             <p className="text-lg text-gray-600 mb-2">
               Thank you for your purchase from{" "}
               <span className="font-semibold text-theme-color">Kwahu Dwaso</span>
             </p>
             <p className="text-gray-500">
-              {orderProcessed 
+              {paymentStatus === "paid"
                 ? "Your order has been confirmed and will be shipped shortly." 
-                : isTimeout
-                  ? "Your payment is still processing safely in the background. You can safely close this page."
-                  : "Please wait while we verify your transaction with Paystack. Do not close this page."}
+                : paymentStatus === "failed"
+                  ? "Unfortunately, your payment could not be processed. Please try again."
+                  : isTimeout
+                    ? "Your payment is still processing safely in the background. You can safely close this page."
+                    : "Please wait while we verify your transaction. Do not close this page."}
             </p>
           </div>
 
           {/* Details Card */}
-          {!orderProcessed ? (
+          {paymentStatus === "pending" && !isTimeout ? (
             <OrderSummarySkeleton />
-          ) : orderDetails ? (
+          ) : orderDetails && paymentStatus === "paid" ? (
             <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8 max-w-md w-full shadow-sm">
               <h3 className="font-semibold text-gray-900 mb-3">
                 Order Summary
@@ -174,3 +210,4 @@ const SuccessPage = () => {
 };
 
 export default SuccessPage;
+

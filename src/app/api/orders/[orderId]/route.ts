@@ -32,12 +32,10 @@ export async function GET(
     }
 
     return NextResponse.json({
-      success: true,
-      order: {
-        status: orderData?.status,
-        paymentStatus: orderData?.paymentStatus,
-        amount: orderData?.amount,
-      }
+      orderId,
+      paymentStatus: orderData?.paymentStatus,
+      status: orderData?.status,
+      amount: orderData?.amount
     });
 
   } catch (error) {

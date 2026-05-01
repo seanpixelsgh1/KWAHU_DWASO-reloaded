@@ -15,6 +15,10 @@ export const POST = async (request: NextRequest) => {
       return NextResponse.json({ error: "Email is required for checkout" }, { status: 400 });
     }
 
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
+    }
+
     const orderRef = existingOrderId 
       ? db.collection("orders").doc(existingOrderId) 
       : db.collection("orders").doc();
@@ -25,32 +29,67 @@ export const POST = async (request: NextRequest) => {
       const price = item.price || (item.total / (item.quantity || 1)) || 0;
       return sum + (price * (item.quantity || 1));
     }, 0) || 0;
-    
-    // 1. Create order in Firestore (pending)
-    await orderRef.set({
-      orderId: finalOrderId,
-      userId,
-      email,
-      customerEmail: email,
-      amount: total,
-      total: total, // backward compatibility alias
-      currency: "GHS",
-      items: items || [],
-      status: "pending",
-      paymentStatus: "pending",
-      paymentProvider: "paystack",
-      paymentReference: null,
-      metadata: {
-        source: "web",
-        currency: "GHS",
-      },
-      paymentMethod: "card",
-      shippingAddress: shippingAddress || null,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
 
-    // 2. Call Paystack initialize endpoint
+    // ─────────────────────────────────────────────
+    // 1. ATOMIC STOCK RESERVATION (Firestore Transaction)
+    // ─────────────────────────────────────────────
+    await db.runTransaction(async (tx) => {
+      for (const item of items) {
+        if (!item.productId) continue;
+
+        const productRef = db.collection("products").doc(item.productId);
+        const productDoc = await tx.get(productRef);
+
+        if (!productDoc.exists) {
+          throw new Error(`Product not found: ${item.productId}`);
+        }
+
+        const product = productDoc.data()!;
+        const currentStock = product.stock || 0;
+        const currentReserved = product.reserved || 0;
+        const available = currentStock - currentReserved;
+
+        if (available < (item.quantity || 1)) {
+          throw new Error(`Insufficient stock for "${product.name || item.productId}". Available: ${available}, Requested: ${item.quantity || 1}`);
+        }
+
+        // Reserve stock
+        tx.update(productRef, {
+          reserved: currentReserved + (item.quantity || 1),
+        });
+      }
+
+      // Create order INSIDE transaction after reservation
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+      tx.set(orderRef, {
+        orderId: finalOrderId,
+        userId,
+        email,
+        customerEmail: email,
+        amount: total,
+        total: total,
+        currency: "GHS",
+        items: items || [],
+        status: "pending",
+        paymentStatus: "pending",
+        paymentProvider: "paystack",
+        paymentReference: null, // Will be set after Paystack init
+        metadata: {
+          source: "web",
+          currency: "GHS",
+        },
+        paymentMethod: "card",
+        shippingAddress: shippingAddress || null,
+        expiresAt,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+
+    // ─────────────────────────────────────────────
+    // 2. INITIALIZE PAYSTACK
+    // ─────────────────────────────────────────────
     const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
     if (!paystackSecretKey) {
       throw new Error("Paystack secret key is missing");
@@ -83,7 +122,9 @@ export const POST = async (request: NextRequest) => {
       throw new Error(paystackData.message || "Failed to initialize payment");
     }
 
-    // 3. Save returned reference to Firestore
+    // ─────────────────────────────────────────────
+    // 3. SAVE PAYMENT REFERENCE
+    // ─────────────────────────────────────────────
     await orderRef.update({
       paymentReference: paystackData.data.reference,
     });
