@@ -16,6 +16,7 @@ import { hasPermission } from "@/lib/rbac/permissions";
 import { adminDb as db } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { auth } from "@/auth";
+import { withTimeout } from "@/lib/utils/withTimeout";
 
 // GET - Fetch orders based on user role
 export async function GET(request: NextRequest) {
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user role using Admin SDK
-    const userDoc = await db.collection("users").doc(session.user.email).get();
+    const userDoc = await withTimeout(db.collection("users").doc(session.user.email).get());
     if (!userDoc.exists) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
         .orderBy("createdAt", "desc");
     }
 
-    const ordersSnapshot = await ordersQuery.get();
+    const ordersSnapshot = await withTimeout(ordersQuery.get());
     const orders = ordersSnapshot.docs.map((doc) => {
       const data = doc.data();
       return {
@@ -78,9 +79,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ orders });
   } catch (error) {
-    console.error("API ERROR [orders-get]:", error);
+    console.error("API ERROR:", error);
     return NextResponse.json(
-      { error: "Failed to fetch orders" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -106,7 +107,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get user role using Admin SDK
-    const userDoc = await db.collection("users").doc(session.user.email).get();
+    const userDoc = await withTimeout(db.collection("users").doc(session.user.email).get());
     if (!userDoc.exists) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -124,7 +125,7 @@ export async function PUT(request: NextRequest) {
 
     // Get current order using Admin SDK
     const orderRef = db.collection("orders").doc(orderId);
-    const orderDoc = await orderRef.get();
+    const orderDoc = await withTimeout(orderRef.get());
 
     if (!orderDoc.exists) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -239,7 +240,7 @@ export async function PUT(request: NextRequest) {
           .doc(orderId);
         
         // Use a check to see if it exists before updating or use merge set
-        const userOrderDoc = await userOrderRef.get();
+        const userOrderDoc = await withTimeout(userOrderRef.get());
         if (userOrderDoc.exists) {
           await userOrderRef.update(updateData);
         }
@@ -255,9 +256,9 @@ export async function PUT(request: NextRequest) {
       updates: updateData,
     });
   } catch (error) {
-    console.error("API ERROR [orders-put]:", error);
+    console.error("API ERROR:", error);
     return NextResponse.json(
-      { error: "Failed to update order" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -329,9 +330,9 @@ export async function POST(request: NextRequest) {
       message: "Order created successfully",
     });
   } catch (error) {
-    console.error("API ERROR [orders-post]:", error);
+    console.error("API ERROR:", error);
     return NextResponse.json(
-      { error: "Failed to create order" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
+import { withTimeout } from "@/lib/utils/withTimeout";
 
 export async function GET() {
   try {
-    const ordersSnapshot = await db.collection("orders").get();
+    const ordersSnapshot = await withTimeout(db.collection("orders").get());
     
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -55,9 +56,9 @@ export async function GET() {
       pendingOrders,
     });
   } catch (error) {
-    console.error("API ERROR [admin-stats-get]:", error);
+    console.error("API ERROR:", error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }

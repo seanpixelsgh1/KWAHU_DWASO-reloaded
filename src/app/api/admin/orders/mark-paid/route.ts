@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { auth } from "@/auth";
 import { FORCE_PREMIUM } from "@/lib/constants/admin";
 import { confirmInventory } from "@/lib/inventory";
+import { withTimeout } from "@/lib/utils/withTimeout";
 
 export async function PUT(request: NextRequest) {
   try {
@@ -32,7 +34,7 @@ export async function PUT(request: NextRequest) {
 
     // ── 3. PRE-TRANSACTION VALIDATIONS ──
     const orderRef = db.collection("orders").doc(orderId);
-    const orderDoc = await orderRef.get();
+    const orderDoc = await withTimeout(orderRef.get());
 
     if (!orderDoc.exists) {
       return NextResponse.json(

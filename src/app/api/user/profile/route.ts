@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { withTimeout } from "@/lib/utils/withTimeout";
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
 
-    const snapshot = await db.collection("users").where("email", "==", email).get();
+    const snapshot = await withTimeout(db.collection("users").where("email", "==", email).get());
 
     if (snapshot.empty) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch unified orders from single source of truth (using userId)
-    const ordersSnapshot = await db.collection("orders").where("userId", "==", userDoc.id).get();
+    const ordersSnapshot = await withTimeout(db.collection("orders").where("userId", "==", userDoc.id).get());
     const orders = ordersSnapshot.docs.map(doc => {
       const data = doc.data();
       return {
@@ -44,9 +45,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ ...userData, orders, id: userDoc.id });
   } catch (error) {
-    console.error("API ERROR [profile-get]:", error);
+    console.error("API ERROR:", error);
     return NextResponse.json(
-      { error: "Failed to fetch profile" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -61,7 +62,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
 
-    const snapshot = await db.collection("users").where("email", "==", email).get();
+    const snapshot = await withTimeout(db.collection("users").where("email", "==", email).get());
 
     if (snapshot.empty) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -120,12 +121,9 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, addresses });
   } catch (error) {
-    console.error("API ERROR [profile-update]:", error);
+    console.error("API ERROR:", error);
     return NextResponse.json(
-      {
-        error: "Failed to update profile",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }

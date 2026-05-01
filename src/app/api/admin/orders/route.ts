@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { withTimeout } from "@/lib/utils/withTimeout";
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const ordersSnapshot = await query.get();
+    const ordersSnapshot = await withTimeout(query.get());
 
     const orders = ordersSnapshot.docs.map((doc) => {
       const data = doc.data();
@@ -98,9 +99,9 @@ export async function GET(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("API ERROR [admin-orders-get]:", error);
+    console.error("API ERROR:", error);
     return NextResponse.json(
-      { success: false, error: "Internal Server Error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -182,9 +183,9 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   } catch (error) {
-    console.error("API ERROR [admin-orders-put]:", error);
+    console.error("API ERROR:", error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -232,9 +233,9 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   } catch (error) {
-    console.error("API ERROR [admin-orders-delete]:", error);
+    console.error("API ERROR:", error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }

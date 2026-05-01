@@ -9,6 +9,16 @@ const bucketName =
   process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
   `${projectId}.appspot.com`;
 
+if (!process.env.FIREBASE_PROJECT_ID ||
+  !process.env.FIREBASE_CLIENT_EMAIL ||
+  !process.env.FIREBASE_PRIVATE_KEY) {
+  throw new Error("Missing Firebase Admin environment variables");
+}
+
+const privateKey = process.env.FIREBASE_PRIVATE_KEY
+  ?.replace(/^"|"$/g, '') // remove accidental quotes
+  ?.replace(/\\n/g, '\n'); // restore line breaks
+
 // Initialize Firebase Admin
 const adminApp =
   getApps().find((app) => app.name === "admin") ||
@@ -17,7 +27,7 @@ const adminApp =
       credential: cert({
         projectId,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+        privateKey: privateKey,
       }),
       storageBucket: bucketName,
     },
