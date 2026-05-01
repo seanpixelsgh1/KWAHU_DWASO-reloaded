@@ -52,7 +52,7 @@ async function OrderDataFetcher({ orderId }: { orderId: string }) {
   }
 }
 
-export default async function AdminOrderPage({ params }: { params: { orderId: string } }) {
+export default async function AdminOrderPage({ params }: { params: Promise<{ orderId: string }> }) {
   // Await the params object (best practice for Next.js 14+ when handling dynamic params)
   const { orderId } = await params;
 

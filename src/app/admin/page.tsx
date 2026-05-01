@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import StatCard from "@/components/admin/StatCard";
 import {
   FiDollarSign,
@@ -114,12 +115,12 @@ export default function AdminDashboardPage() {
         <div className="xl:col-span-2 admin-panel">
           <div className="flex items-center justify-between mb-4">
             <h3 className="admin-panel-title">Recent Orders</h3>
-            <a
+            <Link
               href="/admin/orders"
               className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
             >
               View all →
-            </a>
+            </Link>
           </div>
           <p className="text-sm text-gray-500">
             Orders table will be connected here (paginated + filtered)
