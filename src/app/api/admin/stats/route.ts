@@ -3,50 +3,57 @@ import { adminDb as db } from "@/lib/firebase/admin";
 
 export async function GET() {
   try {
-    // Fetch real data from Firebase using Admin SDK
-    const [usersSnapshot, ordersSnapshot] = await Promise.all([
-      db.collection("users").get(),
-      db.collection("orders").get(),
-    ]);
-
-    const users = usersSnapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-      };
-    });
+    const ordersSnapshot = await db.collection("orders").get();
     
-    const orders = ordersSnapshot.docs.map((doc) => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(now.getDate() - 7);
+
+    let todaysRevenue = 0;
+    let last7DaysOrders = 0;
+    let failedPayments = 0;
+    let pendingOrders = 0;
+
+    ordersSnapshot.docs.forEach((doc) => {
       const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-      };
-    }) as any[];
+      
+      let createdAtDate = new Date();
+      if (data.createdAt) {
+        if (typeof data.createdAt.toDate === "function") {
+          createdAtDate = data.createdAt.toDate();
+        } else if (typeof data.createdAt === "string" || typeof data.createdAt === "number") {
+          const parsedDate = new Date(data.createdAt);
+          if (!isNaN(parsedDate.getTime())) {
+            createdAtDate = parsedDate;
+          }
+        }
+      }
 
-    // Calculate real stats
-    const totalRevenue = orders.reduce(
-      (sum, order) => sum + (Number(order.amount) || Number(order.total) || 0),
-      0
-    );
-    const pendingOrders = orders.filter(
-      (order) => order.status === "pending"
-    ).length;
-    const completedOrders = orders.filter(
-      (order) => order.status === "completed"
-    ).length;
+      const isPaid = data.paymentStatus === "paid" || data.paymentStatus === "success";
+      if (createdAtDate >= startOfToday && isPaid) {
+        todaysRevenue += (typeof data.amount === "number" ? data.amount : 0);
+      }
 
-    const stats = {
-      totalUsers: users.length,
-      totalOrders: orders.length,
-      totalRevenue: totalRevenue,
-      totalProducts: 89, // This would come from products collection if you have it
-      pendingOrders: pendingOrders,
-      completedOrders: completedOrders,
-    };
+      if (createdAtDate >= sevenDaysAgo) {
+        last7DaysOrders += 1;
+      }
 
-    return NextResponse.json(stats);
+      if (data.paymentStatus === "failed") {
+        failedPayments += 1;
+      }
+
+      if (data.status === "pending" || data.status === "processing") {
+        pendingOrders += 1;
+      }
+    });
+
+    return NextResponse.json({
+      todaysRevenue,
+      last7DaysOrders,
+      failedPayments,
+      pendingOrders,
+    });
   } catch (error) {
     console.error("API ERROR [admin-stats-get]:", error);
     return NextResponse.json(

@@ -40,6 +40,7 @@ const getBadgeStyles = (status: string) => {
 export default function OrdersTable({ orders }: { orders: Order[] }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
@@ -104,12 +105,13 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
               <th className="px-6 py-3 font-medium whitespace-nowrap sticky top-0 bg-gray-50">Order Status</th>
               <th className="px-6 py-3 font-medium whitespace-nowrap sticky top-0 bg-gray-50">Method</th>
               <th className="px-6 py-3 font-medium whitespace-nowrap sticky top-0 bg-gray-50">Date</th>
+              <th className="px-6 py-3 font-medium whitespace-nowrap sticky top-0 bg-gray-50 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
             {filteredOrders.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center">
+                <td colSpan={8} className="px-6 py-12 text-center">
                   <div className="flex flex-col items-center justify-center space-y-3">
                     <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
                       <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -156,6 +158,52 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
                       month: 'short',
                       day: 'numeric'
                     })}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="relative inline-block text-left">
+                      <button
+                        onClick={() => setOpenDropdownId(openDropdownId === order.id ? null : order.id)}
+                        className="text-gray-400 hover:text-gray-600 focus:outline-none p-1 rounded-full hover:bg-gray-100 transition-colors"
+                      >
+                        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                        </svg>
+                      </button>
+
+                      {openDropdownId === order.id && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-10" 
+                            onClick={() => setOpenDropdownId(null)}
+                          ></div>
+                          <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 focus:outline-none">
+                            <div className="py-1" role="menu" aria-orientation="vertical">
+                              <button
+                                className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                                role="menuitem"
+                                onClick={() => setOpenDropdownId(null)}
+                              >
+                                View Details
+                              </button>
+                              <button
+                                className="w-full text-left block px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
+                                role="menuitem"
+                                onClick={() => setOpenDropdownId(null)}
+                              >
+                                Mark as Delivered
+                              </button>
+                              <button
+                                className="w-full text-left block px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+                                role="menuitem"
+                                onClick={() => setOpenDropdownId(null)}
+                              >
+                                Cancel Order
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

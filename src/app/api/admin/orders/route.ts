@@ -4,11 +4,38 @@ import { FieldValue } from "firebase-admin/firestore";
 
 export async function GET(request: NextRequest) {
   try {
-    const ordersSnapshot = await db
-      .collection("orders")
-      .orderBy("createdAt", "desc")
-      .limit(20)
-      .get();
+    const url = new URL(request.url);
+    const cursorId = url.searchParams.get("cursor");
+    const statusFilter = url.searchParams.get("status");
+    const paymentStatusFilter = url.searchParams.get("paymentStatus");
+    const searchParam = url.searchParams.get("search");
+
+    let query: any = db.collection("orders");
+
+    if (statusFilter && statusFilter !== "all") {
+      query = query.where("status", "==", statusFilter);
+    }
+
+    if (paymentStatusFilter && paymentStatusFilter !== "all") {
+      query = query.where("paymentStatus", "==", paymentStatusFilter);
+    }
+
+    if (searchParam) {
+      // Due to Firestore limitations (inequality filters require orderBy on the same field),
+      // we implement exact match for server-side email search.
+      query = query.where("email", "==", searchParam);
+    }
+
+    query = query.orderBy("createdAt", "desc").limit(20);
+
+    if (cursorId) {
+      const cursorDoc = await db.collection("orders").doc(cursorId).get();
+      if (cursorDoc.exists) {
+        query = query.startAfter(cursorDoc);
+      }
+    }
+
+    const ordersSnapshot = await query.get();
 
     const orders = ordersSnapshot.docs.map((doc) => {
       const data = doc.data();
@@ -59,10 +86,14 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const lastVisibleDoc = ordersSnapshot.docs[ordersSnapshot.docs.length - 1];
+    const nextCursor = lastVisibleDoc ? lastVisibleDoc.id : null;
+
     return NextResponse.json(
       {
         success: true,
         orders,
+        nextCursor,
       },
       { status: 200 }
     );

@@ -12,12 +12,10 @@ import {
 } from "react-icons/fi";
 
 interface Stats {
-  totalUsers: number;
-  totalOrders: number;
-  totalRevenue: number;
-  totalProducts: number;
+  todaysRevenue: number;
+  last7DaysOrders: number;
+  failedPayments: number;
   pendingOrders: number;
-  completedOrders: number;
 }
 
 export default function AdminDashboardPage() {
@@ -35,12 +33,10 @@ export default function AdminDashboardPage() {
       if (res.ok) {
         const data = await res.json();
         setStats({
-          totalUsers: Number(data.totalUsers) || 0,
-          totalOrders: Number(data.totalOrders) || 0,
-          totalRevenue: Number(data.totalRevenue) || 0,
-          totalProducts: Number(data.totalProducts) || 0,
+          todaysRevenue: Number(data.todaysRevenue) || 0,
+          last7DaysOrders: Number(data.last7DaysOrders) || 0,
+          failedPayments: Number(data.failedPayments) || 0,
           pendingOrders: Number(data.pendingOrders) || 0,
-          completedOrders: Number(data.completedOrders) || 0,
         });
       }
     } catch (error) {
@@ -74,8 +70,8 @@ export default function AdminDashboardPage() {
 
       {/* KPI Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
             <div key={i} className="admin-stat-card animate-pulse">
               <div className="h-3 bg-gray-200 rounded w-24 mb-3" />
               <div className="h-7 bg-gray-200 rounded w-16 mb-2" />
@@ -84,36 +80,30 @@ export default function AdminDashboardPage() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <StatCard
-            title="Revenue"
-            value={`GH₵ ${(stats?.totalRevenue || 0).toFixed(2)}`}
-            subtitle="All time earnings"
+            title="Today's Revenue"
+            value={`GH₵ ${((stats?.todaysRevenue || 0) / 100).toFixed(2)}`}
+            subtitle="Since midnight (Paid only)"
             icon={<FiDollarSign className="w-5 h-5 text-emerald-600" />}
           />
           <StatCard
-            title="Total Orders"
-            value={stats?.totalOrders || 0}
-            subtitle="All time"
+            title="7-Day Volume"
+            value={stats?.last7DaysOrders || 0}
+            subtitle="Orders this week"
             icon={<FiShoppingBag className="w-5 h-5 text-blue-600" />}
           />
           <StatCard
-            title="Pending Orders"
-            value={stats?.pendingOrders || 0}
-            subtitle="Awaiting processing"
-            icon={<FiClock className="w-5 h-5 text-amber-600" />}
-          />
-          <StatCard
             title="Failed Payments"
-            value={0}
-            subtitle="Needs attention"
+            value={stats?.failedPayments || 0}
+            subtitle="Requires attention"
             icon={<FiAlertCircle className="w-5 h-5 text-red-500" />}
           />
           <StatCard
-            title="Low Stock Items"
-            value={0}
-            subtitle="Below threshold"
-            icon={<FiAlertTriangle className="w-5 h-5 text-orange-500" />}
+            title="Action Required"
+            value={stats?.pendingOrders || 0}
+            subtitle="Pending / Processing"
+            icon={<FiClock className="w-5 h-5 text-amber-600" />}
           />
         </div>
       )}
