@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 
 interface Order {
   id: string;
@@ -127,9 +128,13 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
               filteredOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50/80 even:bg-gray-50/50 transition-colors group">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="font-mono text-sm text-gray-600 group-hover:text-blue-600 transition-colors cursor-pointer" title={order.id}>
+                    <Link 
+                      href={`/admin/orders/${order.id}`}
+                      className="font-mono text-sm text-indigo-600 hover:text-indigo-800 hover:underline transition-colors" 
+                      title={order.id}
+                    >
                       #{order.id.slice(0, 8)}
-                    </span>
+                    </Link>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 font-medium">{order.email}</div>

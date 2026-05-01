@@ -57,6 +57,14 @@ export async function GET(request: NextRequest) {
 
     if (!paystackResponse.ok || paystackData.data?.status !== "success") {
       console.error("Fallback Verification Failed:", paystackData);
+      await orderRef.collection("logs").add({
+        event: "payment_verification_failed",
+        message: "Paystack rejected fallback verification",
+        level: "error",
+        actor: "system",
+        createdAt: FieldValue.serverTimestamp(),
+        meta: { source: "fallback", reason: "Paystack status not success", raw: paystackData }
+      });
       return NextResponse.json({ error: "Payment not verified" }, { status: 400 });
     }
 
@@ -67,6 +75,14 @@ export async function GET(request: NextRequest) {
         orderId: orderDoc.id,
         expectedReference: orderData.paymentReference,
         receivedReference: paystackData.data.reference,
+      });
+      await orderRef.collection("logs").add({
+        event: "payment_verification_failed",
+        message: "Reference mismatch during fallback verification",
+        level: "error",
+        actor: "system",
+        createdAt: FieldValue.serverTimestamp(),
+        meta: { source: "fallback", reason: "Reference mismatch" }
       });
       return NextResponse.json({ error: "Reference mismatch" }, { status: 400 });
     }
@@ -81,6 +97,14 @@ export async function GET(request: NextRequest) {
         expected: expectedAmount,
         received: paystackData.data.amount,
       });
+      await orderRef.collection("logs").add({
+        event: "payment_verification_failed",
+        message: "Amount mismatch during fallback verification",
+        level: "error",
+        actor: "system",
+        createdAt: FieldValue.serverTimestamp(),
+        meta: { source: "fallback", reason: "Amount mismatch" }
+      });
       return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
     }
 
@@ -92,6 +116,14 @@ export async function GET(request: NextRequest) {
         reference: paystackData.data.reference,
         expected: orderData.currency,
         received: paystackData.data.currency,
+      });
+      await orderRef.collection("logs").add({
+        event: "payment_verification_failed",
+        message: "Currency mismatch during fallback verification",
+        level: "error",
+        actor: "system",
+        createdAt: FieldValue.serverTimestamp(),
+        meta: { source: "fallback", reason: "Currency mismatch" }
       });
       return NextResponse.json({ error: "Currency mismatch" }, { status: 400 });
     }
@@ -105,18 +137,27 @@ export async function GET(request: NextRequest) {
         expected: orderData.email,
         received: paystackData.data.customer?.email,
       });
+      await orderRef.collection("logs").add({
+        event: "payment_verification_failed",
+        message: "Email mismatch during fallback verification",
+        level: "error",
+        actor: "system",
+        createdAt: FieldValue.serverTimestamp(),
+        meta: { source: "fallback", reason: "Email mismatch" }
+      });
       return NextResponse.json({ error: "Email mismatch" }, { status: 400 });
     }
 
-    // Atomic: Convert reservation → real stock deduction + mark paid
-    await confirmInventory(orderRef, paystackData.data);
-
-    // Add Audit Log
-    await orderRef.collection("logs").add({
+    // Atomic: Convert reservation → real stock deduction + mark paid + log
+    const logPayload = {
       event: "payment_verified_fallback",
-      payload: paystackData.data,
-      createdAt: FieldValue.serverTimestamp(),
-    });
+      message: "Payment successfully verified via fallback system",
+      actor: "system",
+      level: "info",
+      meta: { source: "fallback", reference: paystackData.data.reference, raw: paystackData.data }
+    };
+
+    await confirmInventory(orderRef, paystackData.data, logPayload);
 
     return NextResponse.json({ success: true, paymentStatus: "paid" });
   } catch (error) {

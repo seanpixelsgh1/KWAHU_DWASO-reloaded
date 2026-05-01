@@ -42,7 +42,9 @@ export async function releaseInventory(
  */
 export async function confirmInventory(
   orderRef: FirebaseFirestore.DocumentReference,
-  webhookData?: Record<string, any>
+  webhookData?: Record<string, any>,
+  logPayload?: Record<string, any>,
+  extraUpdates?: Record<string, any>
 ): Promise<void> {
   await db.runTransaction(async (tx) => {
     const orderDoc = await tx.get(orderRef);
@@ -68,11 +70,20 @@ export async function confirmInventory(
 
     tx.update(orderRef, {
       paymentStatus: "paid",
-      status: "processing",
+      status: order.status === "pending" ? "processing" : order.status,
       paidAt: FieldValue.serverTimestamp(),
       paymentMethod: "paystack",
-      gatewayResponse: webhookData?.gateway_response || "Successful",
+      gatewayResponse: webhookData?.gateway_response || webhookData?.source || "Successful",
       updatedAt: FieldValue.serverTimestamp(),
+      ...(extraUpdates || {})
     });
+
+    if (logPayload) {
+      const logRef = orderRef.collection("logs").doc();
+      tx.set(logRef, {
+        ...logPayload,
+        createdAt: FieldValue.serverTimestamp()
+      });
+    }
   });
 }
