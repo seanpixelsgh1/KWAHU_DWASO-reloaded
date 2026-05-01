@@ -4,57 +4,72 @@ import { FieldValue } from "firebase-admin/firestore";
 
 export async function GET(request: NextRequest) {
   try {
-    // Fetch all users with their orders using Admin SDK
-    const usersSnapshot = await db.collection("users").get();
+    const ordersSnapshot = await db
+      .collection("orders")
+      .orderBy("createdAt", "desc")
+      .limit(20)
+      .get();
 
-    const users = usersSnapshot.docs.map((doc) => {
-      const userData = doc.exists ? doc.data() : {};
-      return {
-        id: doc.id,
-        name: userData.name || userData.displayName || "Unknown User",
-        email: userData.email || "",
-        role: userData.role || "user",
-        createdAt: userData.createdAt?.toDate ? userData.createdAt.toDate().toISOString() : 
-                  (userData.createdAt || new Date().toISOString()),
-        orders: userData.orders || [],
-      };
-    });
-
-    // Sort users by creation date
-    users.sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-
-    // Also fetch orders from the orders collection using Admin SDK
-    const ordersSnapshot = await db.collection("orders").get();
-    const standaloneOrders = ordersSnapshot.docs.map((doc) => {
+    const orders = ordersSnapshot.docs.map((doc) => {
       const data = doc.data();
+      
+      // Handle timestamp conversion safely
+      let createdAtIso = new Date().toISOString();
+      if (data.createdAt) {
+        if (typeof data.createdAt.toDate === "function") {
+          createdAtIso = data.createdAt.toDate().toISOString();
+        } else if (typeof data.createdAt === "string" || typeof data.createdAt === "number") {
+          const parsedDate = new Date(data.createdAt);
+          if (!isNaN(parsedDate.getTime())) {
+            createdAtIso = parsedDate.toISOString();
+          }
+        }
+      }
+
+      // Normalize paymentStatus ("pending" | "paid" | "failed")
+      let paymentStatus = "pending";
+      const rawPayment = data.paymentStatus?.toLowerCase();
+      if (["paid", "failed"].includes(rawPayment)) {
+        paymentStatus = rawPayment;
+      } else if (rawPayment === "success") {
+        paymentStatus = "paid"; // Map legacy "success" to "paid"
+      }
+
+      // Normalize status ("pending" | "processing" | "delivered")
+      let status = "pending";
+      const rawStatus = data.status?.toLowerCase();
+      if (["processing", "delivered"].includes(rawStatus)) {
+        status = rawStatus;
+      } else if (rawStatus === "completed") {
+        status = "delivered"; // Map legacy "completed" to "delivered"
+      }
+
+      // Normalize paymentMethod ("paystack" | "cod")
+      const paymentMethod = data.paymentMethod?.toLowerCase() === "cod" ? "cod" : "paystack";
+
       return {
         id: doc.id,
-        ...data,
-        createdAt: data?.createdAt?.toDate ? data.createdAt.toDate().toISOString() : 
-                  (data?.createdAt || new Date().toISOString()),
-        updatedAt: data?.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : 
-                  (data?.updatedAt || new Date().toISOString()),
+        email: data.email || "N/A",
+        amount: typeof data.amount === "number" ? data.amount : 0,
+        currency: "GHS", // Enforced
+        paymentStatus,
+        status,
+        paymentMethod,
+        createdAt: createdAtIso,
       };
     });
 
     return NextResponse.json(
       {
-        users,
-        standaloneOrders,
-        totalUsers: users.length,
-        totalOrders:
-          users.reduce((sum, user) => sum + (user.orders?.length || 0), 0) +
-          standaloneOrders.length,
+        success: true,
+        orders,
       },
       { status: 200 }
     );
   } catch (error) {
     console.error("API ERROR [admin-orders-get]:", error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { success: false, error: "Internal Server Error" },
       { status: 500 }
     );
   }
