@@ -11,7 +11,8 @@ export async function PUT(request: NextRequest) {
     const isDev = process.env.NODE_ENV === "development";
     const isAuthorized = session?.user?.role === "admin" || (FORCE_PREMIUM && isDev);
 
-    if (!isAuthorized) {
+    const adminId = session?.user?.email || session?.user?.id;
+    if (!isAuthorized || !adminId) {
       return NextResponse.json(
         { success: false, error: "Forbidden — Administrator access required" },
         { status: 403 }
@@ -22,9 +23,9 @@ export async function PUT(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { orderId } = body;
 
-    if (!orderId) {
+    if (!orderId || typeof orderId !== "string") {
       return NextResponse.json(
-        { success: false, error: "Missing orderId" },
+        { success: false, error: "Missing or invalid orderId" },
         { status: 400 }
       );
     }
@@ -64,11 +65,15 @@ export async function PUT(request: NextRequest) {
       message: "Admin manually marked payment as paid",
       actor: "admin",
       level: "warning",
-      meta: { source: "manual_override", initiatedBy: session?.user?.email || "admin" }
+      meta: { source: "manual_override", initiatedBy: adminId }
     };
 
     const extraUpdates = {
-      paymentOverride: true
+      paymentOverride: {
+        by: adminId,
+        at: FieldValue.serverTimestamp(),
+        reason: "manual override"
+      }
     };
 
     await confirmInventory(orderRef, { source: "manual_override" }, logPayload, extraUpdates);
@@ -76,7 +81,11 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true, message: "Order successfully marked as paid" });
 
   } catch (error: any) {
-    console.error("API ERROR [admin-orders-mark-paid]:", error);
+    console.error("API_MARK_PAID_ERROR", {
+      orderId,
+      error: error.message,
+      stack: error.stack
+    });
     return NextResponse.json(
       { success: false, error: error.message || "Internal Server Error" },
       { status: 500 }

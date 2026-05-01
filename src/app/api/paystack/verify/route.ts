@@ -8,8 +8,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get("orderId");
 
-    if (!orderId) {
-      return NextResponse.json({ error: "Order ID is required" }, { status: 400 });
+    if (!orderId || typeof orderId !== "string") {
+      return NextResponse.json({ success: false, error: "Missing or invalid orderId" }, { status: 400 });
     }
 
     // Find Order in Firestore
@@ -55,8 +55,13 @@ export async function GET(request: NextRequest) {
 
     const paystackData = await paystackResponse.json();
 
-    if (!paystackResponse.ok || paystackData.data?.status !== "success") {
-      console.error("Fallback Verification Failed:", paystackData);
+    if (!paystackResponse.ok || paystackData.data?.status !== "success" || !paystackData.data?.reference) {
+      console.error("API_VERIFY_ERROR", {
+        type: "verification_failed",
+        orderId: orderDoc.id,
+        status: paystackData.data?.status,
+        reference: paystackData.data?.reference
+      });
       await orderRef.collection("logs").add({
         event: "payment_verification_failed",
         message: "Paystack rejected fallback verification",
@@ -70,7 +75,7 @@ export async function GET(request: NextRequest) {
 
     // Reference Ownership Check
     if (orderData.paymentReference !== paystackData.data.reference) {
-      console.error("Validation failed", {
+      console.error("API_VERIFY_ERROR", {
         type: "reference_mismatch",
         orderId: orderDoc.id,
         expectedReference: orderData.paymentReference,
@@ -88,9 +93,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Validate Amount
-    const expectedAmount = Math.round(orderData.amount * 100);
+    const expectedAmount = Number(orderData.amount) * 100;
+    if (isNaN(expectedAmount)) {
+      console.error("API_VERIFY_ERROR", { type: "invalid_order_amount", orderId: orderDoc.id });
+      return NextResponse.json({ success: false, error: "Invalid order amount" }, { status: 400 });
+    }
+
     if (paystackData.data.amount !== expectedAmount) {
-      console.error("Validation failed", {
+      console.error("API_VERIFY_ERROR", {
         type: "amount_mismatch",
         orderId: orderDoc.id,
         reference: paystackData.data.reference,
@@ -110,7 +120,7 @@ export async function GET(request: NextRequest) {
 
     // Validate Currency
     if (paystackData.data.currency?.toUpperCase() !== orderData.currency?.toUpperCase()) {
-      console.error("Validation failed", {
+      console.error("API_VERIFY_ERROR", {
         type: "currency_mismatch",
         orderId: orderDoc.id,
         reference: paystackData.data.reference,
@@ -130,7 +140,7 @@ export async function GET(request: NextRequest) {
 
     // Validate Email
     if (paystackData.data.customer?.email?.toLowerCase() !== orderData.email?.toLowerCase()) {
-      console.error("Validation failed", {
+      console.error("API_VERIFY_ERROR", {
         type: "email_mismatch",
         orderId: orderDoc.id,
         reference: paystackData.data.reference,
@@ -160,8 +170,11 @@ export async function GET(request: NextRequest) {
     await confirmInventory(orderRef, paystackData.data, logPayload);
 
     return NextResponse.json({ success: true, paymentStatus: "paid" });
-  } catch (error) {
-    console.error("API ERROR [fallback-verify]:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (error: any) {
+    console.error("API_VERIFY_ERROR", {
+      error: error.message,
+      stack: error.stack
+    });
+    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
   }
 }

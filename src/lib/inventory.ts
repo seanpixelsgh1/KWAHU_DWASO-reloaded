@@ -6,7 +6,8 @@ import { FieldValue } from "firebase-admin/firestore";
  * Idempotent: skips if order is not "pending".
  */
 export async function releaseInventory(
-  orderRef: FirebaseFirestore.DocumentReference
+  orderRef: FirebaseFirestore.DocumentReference,
+  logPayload?: Record<string, any>
 ): Promise<void> {
   await db.runTransaction(async (tx) => {
     const orderDoc = await tx.get(orderRef);
@@ -33,6 +34,14 @@ export async function releaseInventory(
       status: "cancelled",
       updatedAt: FieldValue.serverTimestamp(),
     });
+
+    if (logPayload) {
+      const logRef = orderRef.collection("logs").doc();
+      tx.set(logRef, {
+        ...logPayload,
+        createdAt: FieldValue.serverTimestamp()
+      });
+    }
   });
 }
 
@@ -54,18 +63,22 @@ export async function confirmInventory(
     // Idempotency — already processed
     if (order.paymentStatus === "paid") return;
 
-    for (const item of order.items || []) {
-      if (!item.productId) continue;
-      const productRef = db.collection("products").doc(item.productId);
-      const productDoc = await tx.get(productRef);
-      const product = productDoc.data();
+    const isInventoryConfirmed = typeof order.inventoryConfirmed === "undefined" ? false : order.inventoryConfirmed;
 
-      if (!product) continue;
+    if (!isInventoryConfirmed) {
+      for (const item of order.items || []) {
+        if (!item.productId) continue;
+        const productRef = db.collection("products").doc(item.productId);
+        const productDoc = await tx.get(productRef);
+        const product = productDoc.data();
 
-      tx.update(productRef, {
-        stock: Math.max(0, (product.stock || 0) - (item.quantity || 0)),
-        reserved: Math.max(0, (product.reserved || 0) - (item.quantity || 0)),
-      });
+        if (!product) continue;
+
+        tx.update(productRef, {
+          stock: Math.max(0, (product.stock || 0) - (item.quantity || 0)),
+          reserved: Math.max(0, (product.reserved || 0) - (item.quantity || 0)),
+        });
+      }
     }
 
     tx.update(orderRef, {
@@ -75,6 +88,7 @@ export async function confirmInventory(
       paymentMethod: "paystack",
       gatewayResponse: webhookData?.gateway_response || webhookData?.source || "Successful",
       updatedAt: FieldValue.serverTimestamp(),
+      inventoryConfirmed: true,
       ...(extraUpdates || {})
     });
 

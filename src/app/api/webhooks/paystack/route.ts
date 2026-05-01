@@ -19,22 +19,22 @@ async function processWebhookEvent(event: any) {
         .get();
 
       if (orderQuery.empty) {
-        console.error("Order not found for reference:", reference);
+        console.error("WEBHOOK_ERROR", { type: "order_not_found", reference });
         return;
       }
 
       const orderDoc = orderQuery.docs[0];
       const orderData = orderDoc.data();
 
-      // 6. Idempotency Protection
+      // 6. Idempotency Protection (Outer Guard, inner guard is in confirmInventory)
       if (orderData.paymentStatus === "paid") {
-        console.log("Already processed", { orderId: orderDoc.id, reference });
+        console.log("WEBHOOK_INFO", { message: "Already processed", orderId: orderDoc.id, reference });
         return;
       }
 
       // Reference Ownership Check
       if (orderData.paymentReference !== data.reference) {
-        console.error("Validation failed", {
+        console.error("WEBHOOK_ERROR", {
           type: "reference_mismatch",
           orderId: orderDoc.id,
           expectedReference: orderData.paymentReference,
@@ -44,9 +44,14 @@ async function processWebhookEvent(event: any) {
       }
 
       // 7. Amount Validation (Anti-Tamper)
-      const expectedAmount = Math.round(orderData.amount * 100);
+      const expectedAmount = Number(orderData.amount) * 100;
+      if (isNaN(expectedAmount)) {
+        console.error("WEBHOOK_ERROR", { type: "invalid_order_amount", orderId: orderDoc.id });
+        return;
+      }
+
       if (data.amount !== expectedAmount) {
-        console.error("Validation failed", {
+        console.error("WEBHOOK_ERROR", {
           type: "amount_mismatch",
           orderId: orderDoc.id,
           reference: data.reference,
@@ -58,7 +63,7 @@ async function processWebhookEvent(event: any) {
 
       // Currency Validation
       if (data.currency?.toUpperCase() !== orderData.currency?.toUpperCase()) {
-        console.error("Validation failed", {
+        console.error("WEBHOOK_ERROR", {
           type: "currency_mismatch",
           orderId: orderDoc.id,
           reference: data.reference,
@@ -70,7 +75,7 @@ async function processWebhookEvent(event: any) {
 
       // Email Validation
       if (data.customer?.email?.toLowerCase() !== orderData.email?.toLowerCase()) {
-        console.error("Validation failed", {
+        console.error("WEBHOOK_ERROR", {
           type: "email_mismatch",
           orderId: orderDoc.id,
           reference: data.reference,
@@ -83,14 +88,15 @@ async function processWebhookEvent(event: any) {
       // ─────────────────────────────────────────────
       // 8. ATOMIC: Convert reservation → real stock deduction + mark paid
       // ─────────────────────────────────────────────
-      await confirmInventory(orderDoc.ref, data);
-
-      // 9. Add Payment Audit Log
-      await orderDoc.ref.collection("logs").add({
+      const logPayload = {
         event: "payment_verified",
-        payload: data,
-        createdAt: FieldValue.serverTimestamp(),
-      });
+        message: "Payment successfully verified via webhook",
+        actor: "system",
+        level: "info",
+        meta: { source: "webhook", reference: data.reference, raw: data }
+      };
+
+      await confirmInventory(orderDoc.ref, data, logPayload);
 
     } else if (event.event === "charge.failed") {
       // ─────────────────────────────────────────────
@@ -107,18 +113,24 @@ async function processWebhookEvent(event: any) {
 
       if (!orderQuery.empty) {
         const orderDoc = orderQuery.docs[0];
-        await releaseInventory(orderDoc.ref);
-
-        // Audit log for failed payment
-        await orderDoc.ref.collection("logs").add({
+        
+        const logPayload = {
           event: "payment_failed",
-          payload: data,
-          createdAt: FieldValue.serverTimestamp(),
-        });
+          message: "Payment failed via webhook",
+          actor: "system",
+          level: "error",
+          meta: { source: "webhook", reference: data.reference, raw: data }
+        };
+
+        await releaseInventory(orderDoc.ref, logPayload);
       }
     }
-  } catch (error) {
-    console.error("WEBHOOK ERROR [processWebhookEvent]:", error);
+  } catch (error: any) {
+    console.error("WEBHOOK_ERROR", {
+      type: "process_webhook_event_error",
+      error: error.message,
+      stack: error.stack
+    });
   }
 }
 
@@ -130,7 +142,7 @@ export async function POST(req: NextRequest) {
     // 2. Verify Paystack Signature
     const secret = process.env.PAYSTACK_SECRET_KEY;
     if (!secret) {
-      console.error("PAYSTACK_SECRET_KEY is missing");
+      console.error("WEBHOOK_ERROR", { type: "missing_secret" });
       return new Response("Server error", { status: 500 });
     }
 
@@ -145,7 +157,7 @@ export async function POST(req: NextRequest) {
       .digest("hex");
 
     if (hash !== signature) {
-      console.error("Paystack Webhook: Invalid Signature");
+      console.error("WEBHOOK_ERROR", { type: "invalid_signature" });
       return new Response("Invalid signature", { status: 401 });
     }
 
@@ -157,8 +169,12 @@ export async function POST(req: NextRequest) {
 
     // Immediately return 200 to acknowledge webhook
     return new Response("Webhook received", { status: 200 });
-  } catch (error) {
-    console.error("WEBHOOK ERROR [paystack]:", error);
+  } catch (error: any) {
+    console.error("WEBHOOK_ERROR", {
+      type: "paystack_post_error",
+      error: error.message,
+      stack: error.stack
+    });
     return new Response("Internal server error", { status: 500 });
   }
 }

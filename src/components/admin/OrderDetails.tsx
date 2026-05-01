@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import toast from "react-hot-toast";
 import { 
   FiArrowLeft, FiCopy, FiCheck, FiX, FiClock, 
   FiBox, FiCheckCircle, FiAlertCircle 
@@ -39,7 +40,7 @@ interface OrderType {
   status: string;
   paymentStatus: string;
   paymentMethod: string;
-  paymentOverride?: boolean;
+  paymentOverride?: { by: string; at: any; reason: string };
   createdAt: string;
   items: OrderItem[];
   shippingAddress: any;
@@ -136,10 +137,12 @@ export default function OrderDetails({ order }: { order: OrderType }) {
         throw new Error(data.error || "Failed to update status");
       }
 
+      toast.success("Status updated successfully");
       router.refresh();
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || "An unexpected error occurred.");
+      toast.error(err.message || "Failed to update status");
     } finally {
       setLoadingAction(null);
     }
@@ -157,10 +160,12 @@ export default function OrderDetails({ order }: { order: OrderType }) {
         throw new Error(data.error || "Failed to verify payment");
       }
 
+      toast.success("Payment verified successfully");
       router.refresh();
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || "An unexpected error occurred.");
+      toast.error(err.message || "Verification failed");
     } finally {
       setLoadingAction(null);
     }
@@ -186,17 +191,29 @@ export default function OrderDetails({ order }: { order: OrderType }) {
         throw new Error(data.error || "Failed to mark as paid");
       }
 
+      toast.success("Manual override applied");
       router.refresh();
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || "An unexpected error occurred.");
+      toast.error(err.message || "Override failed");
     } finally {
       setLoadingAction(null);
     }
   };
 
-  // Read Explicit System Flags from server
   const flags = order.flags || { paymentVerified: false, inventoryReserved: false, inventoryConfirmed: false };
+
+  const getPaymentSource = () => {
+    if (order.paymentOverride) return "Manual Override";
+    const latestPaymentLog = order.logs.filter(l => l.event.includes("payment"))[0];
+    if (latestPaymentLog?.meta?.source) {
+      return latestPaymentLog.meta.source === "webhook" ? "Webhook" : 
+             latestPaymentLog.meta.source === "fallback" ? "Fallback" : 
+             latestPaymentLog.meta.source;
+    }
+    return "Unknown";
+  };
 
   const totalItemAmount = order.items.reduce((sum, item) => sum + item.total, 0);
 
@@ -238,7 +255,7 @@ export default function OrderDetails({ order }: { order: OrderType }) {
               <span className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border ${getBadgeStyles(order.status)}`}>
                 {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
               </span>
-              <span className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border ${getBadgeStyles(order.paymentStatus, order.paymentOverride)}`}>
+              <span className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border ${getBadgeStyles(order.paymentStatus, !!order.paymentOverride)}`}>
                 Payment: {order.paymentOverride ? "Overridden" : order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
               </span>
             </div>
@@ -272,6 +289,10 @@ export default function OrderDetails({ order }: { order: OrderType }) {
                   ) : (
                     <span className="text-gray-400 italic">N/A</span>
                   )}
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Payment Source:</span>
+                  <span className="font-medium text-gray-900 capitalize">{getPaymentSource()}</span>
                 </div>
               </div>
               
@@ -315,7 +336,17 @@ export default function OrderDetails({ order }: { order: OrderType }) {
                               <p><span className="font-semibold text-gray-500">Event:</span> {latestPaymentLog.event}</p>
                               <p><span className="font-semibold text-gray-500">Time:</span> {new Date(latestPaymentLog.createdAt).toLocaleString()}</p>
                               <pre className="mt-2 text-gray-700 font-mono text-[10px]">
-                                {JSON.stringify(latestPaymentLog.meta, null, 2)}
+                                {JSON.stringify(
+                                  latestPaymentLog.meta?.raw ? {
+                                    reference: latestPaymentLog.meta.raw.reference,
+                                    amount: latestPaymentLog.meta.raw.amount,
+                                    status: latestPaymentLog.meta.raw.status,
+                                    paid_at: latestPaymentLog.meta.raw.paidAt || latestPaymentLog.meta.raw.paid_at,
+                                    channel: latestPaymentLog.meta.raw.channel,
+                                  } : latestPaymentLog.meta,
+                                  null, 
+                                  2
+                                )}
                               </pre>
                             </div>
                           );
