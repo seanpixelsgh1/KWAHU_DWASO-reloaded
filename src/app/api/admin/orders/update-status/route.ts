@@ -126,7 +126,7 @@ export async function PUT(request: NextRequest) {
         },
       });
 
-      // ── Inventory Release on Cancel ──
+      // ── Inventory Adjustment on Cancel (C-3: status-aware) ──
       if (newStatus === "cancelled") {
         const items = Array.isArray(data.items) ? data.items : [];
         let releasedCount = 0;
@@ -137,22 +137,45 @@ export async function PUT(request: NextRequest) {
 
           if (productId && quantity > 0) {
             const productRef = db.collection("products").doc(productId);
-            tx.update(productRef, {
-              stock: FieldValue.increment(quantity),
-            });
+
+            if (currentStatus === "pending") {
+              // PENDING → stock was reserved, not deducted. Release reservation only.
+              tx.update(productRef, {
+                reserved: FieldValue.increment(-quantity),
+              });
+            } else if (currentStatus === "processing") {
+              // PROCESSING → stock was deducted. Restore actual stock + reset flag.
+              tx.update(productRef, {
+                stock: FieldValue.increment(quantity),
+              });
+            }
             releasedCount += quantity;
           }
+        }
+
+        // Mark payment as failed when cancelling a pending order
+        // Reset inventoryConfirmed when cancelling a processing order
+        const cancelUpdates: Record<string, any> = {};
+        if (currentStatus === "pending") {
+          cancelUpdates.paymentStatus = "failed";
+          cancelUpdates.inventoryReleased = true;
+        } else if (currentStatus === "processing") {
+          cancelUpdates.inventoryConfirmed = false;
+          cancelUpdates.inventoryReleased = true;
+        }
+        if (Object.keys(cancelUpdates).length > 0) {
+          tx.update(orderRef, cancelUpdates);
         }
 
         if (releasedCount > 0) {
           const invLogRef = orderRef.collection("logs").doc();
           tx.set(invLogRef, {
             event: "inventory_released",
-            message: `Inventory restored: ${releasedCount} unit(s) returned to stock`,
+            message: `Inventory ${currentStatus === "pending" ? "reservation released" : "restored"}: ${releasedCount} unit(s)`,
             level: "info",
             actor: "system",
             createdAt: FieldValue.serverTimestamp(),
-            meta: { unitsReleased: releasedCount },
+            meta: { unitsReleased: releasedCount, previousStatus: currentStatus },
           });
         }
       }

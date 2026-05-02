@@ -32,6 +32,7 @@ export async function releaseInventory(
     tx.update(orderRef, {
       paymentStatus: "failed",
       status: "cancelled",
+      inventoryReleased: true, // O-1: Track inventory release
       updatedAt: FieldValue.serverTimestamp(),
     });
 
@@ -63,22 +64,29 @@ export async function confirmInventory(
     // Idempotency — already processed
     if (order.paymentStatus === "paid") return;
 
-    const isInventoryConfirmed = typeof order.inventoryConfirmed === "undefined" ? false : order.inventoryConfirmed;
+    // C-2: Block confirmation on cancelled/failed orders (prevents late webhook resurrection)
+    if (order.status === "cancelled") return;
+    if (order.paymentStatus === "failed") return;
 
-    if (!isInventoryConfirmed) {
-      for (const item of order.items || []) {
-        if (!item.productId) continue;
-        const productRef = db.collection("products").doc(item.productId);
-        const productDoc = await tx.get(productRef);
-        const product = productDoc.data();
+    // Guard on business flag — prevents double-deduction on transaction retries
+    if (order.inventoryConfirmed) return;
 
-        if (!product) continue;
+    // Final safety guard — inventory was already released (cron/admin), cannot re-confirm
+    if (order.inventoryReleased) return;
 
-        tx.update(productRef, {
-          stock: Math.max(0, (product.stock || 0) - (item.quantity || 0)),
-          reserved: Math.max(0, (product.reserved || 0) - (item.quantity || 0)),
-        });
-      }
+    // Deduct stock and release reservation (we already know inventoryConfirmed is false)
+    for (const item of order.items || []) {
+      if (!item.productId) continue;
+      const productRef = db.collection("products").doc(item.productId);
+      const productDoc = await tx.get(productRef);
+      const product = productDoc.data();
+
+      if (!product) continue;
+
+      tx.update(productRef, {
+        stock: Math.max(0, (product.stock || 0) - (item.quantity || 0)),
+        reserved: Math.max(0, (product.reserved || 0) - (item.quantity || 0)),
+      });
     }
 
     tx.update(orderRef, {

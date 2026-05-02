@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { auth } from "@/auth";
+import { releaseInventory } from "@/lib/inventory";
 
 export const POST = async (request: NextRequest) => {
   try {
@@ -9,7 +10,7 @@ export const POST = async (request: NextRequest) => {
     const userId = session?.user?.id || "";
     
     const reqBody = await request.json();
-    const { items, email, shippingAddress, orderId: existingOrderId, orderAmount } = reqBody;
+    const { items, email, shippingAddress, orderId: existingOrderId, idempotencyKey } = reqBody;
 
     if (!email) {
       return NextResponse.json({ error: "Email is required for checkout" }, { status: 400 });
@@ -19,21 +20,39 @@ export const POST = async (request: NextRequest) => {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
     }
 
-    const orderRef = existingOrderId 
-      ? db.collection("orders").doc(existingOrderId) 
-      : db.collection("orders").doc();
-      
+    // ─────────────────────────────────────────────
+    // 0. IDEMPOTENCY: Use idempotencyKey as doc ID for atomic uniqueness
+    // ─────────────────────────────────────────────
+    const docId = idempotencyKey || existingOrderId || db.collection("orders").doc().id;
+    const orderRef = db.collection("orders").doc(docId);
     const finalOrderId = orderRef.id;
 
-    const total = orderAmount || items?.reduce((sum: number, item: any) => {
-      const price = item.price || (item.total / (item.quantity || 1)) || 0;
-      return sum + (price * (item.quantity || 1));
-    }, 0) || 0;
+    // Check if this order already exists (idempotent retry)
+    if (idempotencyKey) {
+      const existingDoc = await orderRef.get();
+      if (existingDoc.exists) {
+        const existingData = existingDoc.data();
+        // If already has an authorization_url cached, return it directly (no duplicate Paystack session)
+        if (existingData?.authorization_url) {
+          return NextResponse.json({
+            success: true,
+            authorization_url: existingData.authorization_url,
+            orderId: existingDoc.id,
+            idempotent: true,
+          });
+        }
+      }
+    }
+
+    // Total is computed server-side from Firestore inside the transaction (see below)
 
     // ─────────────────────────────────────────────
     // 1. ATOMIC STOCK RESERVATION (Firestore Transaction)
     // ─────────────────────────────────────────────
+    let total = 0;
+
     await db.runTransaction(async (tx) => {
+      // SERVER-SIDE PRICING: Compute total from Firestore (never trust client prices)
       for (const item of items) {
         if (!item.productId) continue;
 
@@ -45,23 +64,28 @@ export const POST = async (request: NextRequest) => {
         }
 
         const product = productDoc.data()!;
+        const price = product.price || 0;
+        const quantity = item.quantity || 1;
         const currentStock = product.stock || 0;
         const currentReserved = product.reserved || 0;
         const available = currentStock - currentReserved;
 
-        if (available < (item.quantity || 1)) {
-          throw new Error(`Insufficient stock for "${product.name || item.productId}". Available: ${available}, Requested: ${item.quantity || 1}`);
+        if (available < quantity) {
+          throw new Error(`Insufficient stock for "${product.name || item.productId}". Available: ${available}, Requested: ${quantity}`);
         }
+
+        total += price * quantity;
 
         // Reserve stock
         tx.update(productRef, {
-          reserved: currentReserved + (item.quantity || 1),
+          reserved: currentReserved + quantity,
         });
       }
 
       // Create order INSIDE transaction after reservation
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
+      // Create order INSIDE transaction — paymentReference set atomically
       tx.set(orderRef, {
         orderId: finalOrderId,
         userId,
@@ -74,7 +98,8 @@ export const POST = async (request: NextRequest) => {
         status: "pending",
         paymentStatus: "pending",
         paymentProvider: "paystack",
-        paymentReference: null, // Will be set after Paystack init
+        paymentReference: finalOrderId, // C-1: Set atomically (same value sent to Paystack)
+        ...(idempotencyKey ? { idempotencyKey } : {}),
         metadata: {
           source: "web",
           currency: "GHS",
@@ -82,13 +107,33 @@ export const POST = async (request: NextRequest) => {
         paymentMethod: "card",
         shippingAddress: shippingAddress || null,
         expiresAt,
+        // O-1: Inventory tracking flags
+        inventoryReserved: true,
+        inventoryConfirmed: false,
+        inventoryReleased: false,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
+
+      // O-2: Log reservation event (after order creation in same tx)
+      const logRef = orderRef.collection("logs").doc();
+      tx.set(logRef, {
+        event: "inventory_reserved",
+        message: `Stock reserved for ${items.length} item(s)`,
+        actor: "system",
+        level: "info",
+        createdAt: FieldValue.serverTimestamp(),
+        meta: {
+          items: items.map((i: any) => ({
+            productId: i.productId,
+            quantity: i.quantity || 1,
+          })),
+        },
+      });
     });
 
     // ─────────────────────────────────────────────
-    // 2. INITIALIZE PAYSTACK
+    // 2. INITIALIZE PAYSTACK (with inventory rollback on failure)
     // ─────────────────────────────────────────────
     const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
     if (!paystackSecretKey) {
@@ -106,30 +151,42 @@ export const POST = async (request: NextRequest) => {
       callback_url: callbackUrl,
     };
 
-    const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${paystackSecretKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(paystackPayload),
-    });
+    let paystackData;
 
-    const paystackData = await paystackResponse.json();
+    try {
+      const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${paystackSecretKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(paystackPayload),
+      });
 
-    if (!paystackResponse.ok || !paystackData.status) {
-      console.error("Paystack Initialize Error:", paystackData);
-      throw new Error(paystackData.message || "Failed to initialize payment");
+      paystackData = await paystackResponse.json();
+
+      if (!paystackResponse.ok || !paystackData.status) {
+        console.error("Paystack Initialize Error:", paystackData);
+        throw new Error(paystackData.message || "Failed to initialize payment");
+      }
+    } catch (err) {
+      // Release reserved inventory before propagating failure
+      await releaseInventory(orderRef, {
+        event: "payment_init_failed",
+        message: "Paystack initialization failed — inventory released",
+        actor: "system",
+        level: "error",
+      });
+      throw err;
     }
 
-    // ─────────────────────────────────────────────
-    // 3. SAVE PAYMENT REFERENCE
-    // ─────────────────────────────────────────────
+    // Persist authorization_url to prevent duplicate Paystack sessions on retry
     await orderRef.update({
-      paymentReference: paystackData.data.reference,
+      authorization_url: paystackData.data.authorization_url,
+      access_code: paystackData.data.access_code,
     });
 
-    // 4. Return authorization info
+    // 4. Return authorization info (paymentReference already set in tx)
     return NextResponse.json({
       success: true,
       authorization_url: paystackData.data.authorization_url,

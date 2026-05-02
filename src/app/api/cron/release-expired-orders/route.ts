@@ -40,15 +40,14 @@ export async function GET(request: NextRequest) {
 
     for (const doc of snapshot.docs) {
       try {
-        await releaseInventory(doc.ref);
-        released++;
-
-        // Audit log
-        await doc.ref.collection("logs").add({
+        // M-2: Pass log INTO releaseInventory for transactional consistency
+        await releaseInventory(doc.ref, {
           event: "order_expired_released",
-          reason: "Payment timeout (15 min expiry)",
-          createdAt: new Date(),
+          message: "Payment timeout (15 min expiry)",
+          actor: "system",
+          level: "warning",
         });
+        released++;
       } catch (err: any) {
         console.error(`Failed to release order ${doc.id}:`, err);
         errors.push(doc.id);

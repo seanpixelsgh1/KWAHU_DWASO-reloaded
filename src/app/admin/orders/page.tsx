@@ -2,20 +2,60 @@ import { Suspense } from "react";
 import OrdersTable from "@/components/admin/OrdersTable";
 import AutoRefresh from "@/components/admin/AutoRefresh";
 
+import { adminDb as db } from "@/lib/firebase/admin";
+import { withTimeout } from "@/lib/utils/withTimeout";
+
 async function OrdersDataFetcher() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  
   try {
-    const res = await fetch(`${baseUrl}/api/admin/orders`, {
-      cache: "no-store",
+    const query = db.collection("orders").orderBy("createdAt", "desc").limit(100);
+    const ordersSnapshot = await withTimeout(query.get());
+
+    const orders = ordersSnapshot.docs.map((doc) => {
+      const data = doc.data();
+      
+      let createdAtIso = new Date().toISOString();
+      if (data.createdAt) {
+        if (typeof data.createdAt.toDate === "function") {
+          createdAtIso = data.createdAt.toDate().toISOString();
+        } else if (typeof data.createdAt === "string" || typeof data.createdAt === "number") {
+          const parsedDate = new Date(data.createdAt);
+          if (!isNaN(parsedDate.getTime())) {
+            createdAtIso = parsedDate.toISOString();
+          }
+        }
+      }
+
+      let paymentStatus = "pending";
+      const rawPayment = data.paymentStatus?.toLowerCase();
+      if (["paid", "failed"].includes(rawPayment)) {
+        paymentStatus = rawPayment;
+      } else if (rawPayment === "success") {
+        paymentStatus = "paid";
+      }
+
+      let status = "pending";
+      const rawStatus = data.status?.toLowerCase();
+      if (["processing", "delivered"].includes(rawStatus)) {
+        status = rawStatus;
+      } else if (rawStatus === "completed") {
+        status = "delivered";
+      }
+
+      const paymentMethod = data.paymentMethod?.toLowerCase() === "cod" ? "cod" : "paystack";
+
+      return {
+        id: doc.id,
+        email: data.email || "N/A",
+        amount: typeof data.amount === "number" ? data.amount : 0,
+        currency: "GHS",
+        paymentStatus,
+        status,
+        paymentMethod,
+        createdAt: createdAtIso,
+      };
     });
 
-    if (!res.ok) {
-      throw new Error(`Failed to fetch orders: ${res.status}`);
-    }
-
-    const data = await res.json();
-    return <OrdersTable orders={data.orders || []} />;
+    return <OrdersTable orders={orders} />;
   } catch (error: any) {
     console.error("Error fetching admin orders:", error);
     return (

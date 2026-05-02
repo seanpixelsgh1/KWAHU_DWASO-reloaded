@@ -84,7 +84,6 @@ export async function PUT(request: NextRequest) {
 
   } catch (error: any) {
     console.error("API_MARK_PAID_ERROR", {
-      orderId,
       error: error.message,
       stack: error.stack
     });

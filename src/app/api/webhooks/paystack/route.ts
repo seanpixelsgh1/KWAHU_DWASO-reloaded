@@ -11,20 +11,16 @@ async function processWebhookEvent(event: any) {
       const data = event.data;
       const reference = data.reference;
 
-      // 5. Find Order in Firestore
-      const orderQuery = await db
-        .collection("orders")
-        .where("paymentReference", "==", reference)
-        .limit(1)
-        .get();
+      // 5. Direct document lookup (O(1) — paymentReference === orderId)
+      const orderRef = db.collection("orders").doc(reference);
+      const orderDoc = await orderRef.get();
 
-      if (orderQuery.empty) {
+      if (!orderDoc.exists) {
         console.error("WEBHOOK_ERROR", { type: "order_not_found", reference });
         return;
       }
 
-      const orderDoc = orderQuery.docs[0];
-      const orderData = orderDoc.data();
+      const orderData = orderDoc.data()!;
 
       // 6. Idempotency Protection (Outer Guard, inner guard is in confirmInventory)
       if (orderData.paymentStatus === "paid") {
@@ -85,6 +81,17 @@ async function processWebhookEvent(event: any) {
         return;
       }
 
+      // Expiry Guard — block late payments for expired orders
+      const now = new Date();
+      if (orderData.expiresAt && orderData.expiresAt.toDate() < now) {
+        console.error("WEBHOOK_ERROR", {
+          type: "expired_order_payment_attempt",
+          orderId: orderDoc.id,
+          reference: data.reference,
+        });
+        return;
+      }
+
       // ─────────────────────────────────────────────
       // 8. ATOMIC: Convert reservation → real stock deduction + mark paid
       // ─────────────────────────────────────────────
@@ -105,15 +112,42 @@ async function processWebhookEvent(event: any) {
       const data = event.data;
       const reference = data.reference;
 
-      const orderQuery = await db
-        .collection("orders")
-        .where("paymentReference", "==", reference)
-        .limit(1)
-        .get();
+      // Guard against malformed events
+      if (!reference) {
+        console.error("WEBHOOK_ERROR", { type: "missing_reference_on_failure", event: event.event });
+        return;
+      }
 
-      if (!orderQuery.empty) {
-        const orderDoc = orderQuery.docs[0];
-        
+      // Direct document lookup (O(1) — paymentReference === orderId)
+      const orderRef = db.collection("orders").doc(reference);
+      const orderDoc = await orderRef.get();
+
+      if (orderDoc.exists) {
+        const orderData = orderDoc.data()!;
+
+        // Validate amount before release
+        const expectedAmount = Number(orderData.amount) * 100;
+        if (data.amount !== expectedAmount) {
+          console.error("WEBHOOK_ERROR", {
+            type: "failed_amount_mismatch",
+            orderId: orderDoc.id,
+            expected: expectedAmount,
+            received: data.amount,
+          });
+          return;
+        }
+
+        // Validate email before release
+        if (data.customer?.email?.toLowerCase() !== orderData.email?.toLowerCase()) {
+          console.error("WEBHOOK_ERROR", {
+            type: "failed_email_mismatch",
+            orderId: orderDoc.id,
+            expected: orderData.email,
+            received: data.customer?.email,
+          });
+          return;
+        }
+
         const logPayload = {
           event: "payment_failed",
           message: "Payment failed via webhook",
@@ -131,6 +165,18 @@ async function processWebhookEvent(event: any) {
       error: error.message,
       stack: error.stack
     });
+
+    // Dead letter queue — persist failed events for recovery
+    try {
+      await db.collection("webhook_failures").add({
+        event,
+        error: error.message,
+        stack: error.stack,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    } catch (dlqError: any) {
+      console.error("WEBHOOK_DLQ_ERROR", { error: dlqError.message });
+    }
   }
 }
 
