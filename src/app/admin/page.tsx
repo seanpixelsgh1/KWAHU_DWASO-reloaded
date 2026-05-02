@@ -1,6 +1,3 @@
-"use client";
-
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import StatCard from "@/components/admin/StatCard";
 import {
@@ -8,44 +5,79 @@ import {
   FiShoppingBag,
   FiClock,
   FiAlertCircle,
-  FiAlertTriangle,
   FiRefreshCw,
 } from "react-icons/fi";
+import { adminDb as db } from "@/lib/firebase/admin";
+import { withTimeout } from "@/lib/utils/withTimeout";
 
-interface Stats {
-  todaysRevenue: number;
-  last7DaysOrders: number;
-  failedPayments: number;
-  pendingOrders: number;
+export const dynamic = "force-dynamic";
+
+async function getAdminStats() {
+  try {
+    const ordersSnapshot = await withTimeout(db.collection("orders").get());
+    
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(now.getDate() - 7);
+
+    let todaysRevenue = 0;
+    let last7DaysOrders = 0;
+    let failedPayments = 0;
+    let pendingOrders = 0;
+
+    ordersSnapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      
+      let createdAtDate = new Date();
+      if (data.createdAt) {
+        if (typeof data.createdAt.toDate === "function") {
+          createdAtDate = data.createdAt.toDate();
+        } else if (typeof data.createdAt === "string" || typeof data.createdAt === "number") {
+          const parsedDate = new Date(data.createdAt);
+          if (!isNaN(parsedDate.getTime())) {
+            createdAtDate = parsedDate;
+          }
+        }
+      }
+
+      const isPaid = data.paymentStatus === "paid" || data.paymentStatus === "success";
+      if (createdAtDate >= startOfToday && isPaid) {
+        todaysRevenue += (typeof data.amount === "number" ? data.amount : 0);
+      }
+
+      if (createdAtDate >= sevenDaysAgo) {
+        last7DaysOrders += 1;
+      }
+
+      if (data.paymentStatus === "failed") {
+        failedPayments += 1;
+      }
+
+      if (data.status === "pending" || data.status === "processing") {
+        pendingOrders += 1;
+      }
+    });
+
+    return {
+      todaysRevenue,
+      last7DaysOrders,
+      failedPayments,
+      pendingOrders,
+    };
+  } catch (error) {
+    console.error("Error fetching admin stats:", error);
+    return {
+      todaysRevenue: 0,
+      last7DaysOrders: 0,
+      failedPayments: 0,
+      pendingOrders: 0,
+    };
+  }
 }
 
-export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/admin/stats");
-      if (res.ok) {
-        const data = await res.json();
-        setStats({
-          todaysRevenue: Number(data.todaysRevenue) || 0,
-          last7DaysOrders: Number(data.last7DaysOrders) || 0,
-          failedPayments: Number(data.failedPayments) || 0,
-          pendingOrders: Number(data.pendingOrders) || 0,
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching admin stats:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+export default async function AdminDashboardPage() {
+  const stats = await getAdminStats();
 
   return (
     <div className="space-y-6">
@@ -57,57 +89,42 @@ export default function AdminDashboardPage() {
             Real-time snapshot of your marketplace
           </p>
         </div>
-        <button
-          onClick={fetchStats}
-          disabled={loading}
-          className="admin-btn-secondary"
+        <Link
+          href="/admin"
+          className="admin-btn-secondary flex items-center gap-2"
         >
-          <FiRefreshCw
-            className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-          />
+          <FiRefreshCw className="w-4 h-4" />
           <span>Refresh</span>
-        </button>
+        </Link>
       </div>
 
       {/* KPI Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="admin-stat-card animate-pulse">
-              <div className="h-3 bg-gray-200 rounded w-24 mb-3" />
-              <div className="h-7 bg-gray-200 rounded w-16 mb-2" />
-              <div className="h-2.5 bg-gray-100 rounded w-20" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <StatCard
-            title="Today's Revenue"
-            value={`GH₵ ${((stats?.todaysRevenue || 0) / 100).toFixed(2)}`}
-            subtitle="Since midnight (Paid only)"
-            icon={<FiDollarSign className="w-5 h-5 text-emerald-600" />}
-          />
-          <StatCard
-            title="7-Day Volume"
-            value={stats?.last7DaysOrders || 0}
-            subtitle="Orders this week"
-            icon={<FiShoppingBag className="w-5 h-5 text-blue-600" />}
-          />
-          <StatCard
-            title="Failed Payments"
-            value={stats?.failedPayments || 0}
-            subtitle="Requires attention"
-            icon={<FiAlertCircle className="w-5 h-5 text-red-500" />}
-          />
-          <StatCard
-            title="Action Required"
-            value={stats?.pendingOrders || 0}
-            subtitle="Pending / Processing"
-            icon={<FiClock className="w-5 h-5 text-amber-600" />}
-          />
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard
+          title="Today's Revenue"
+          value={`GH₵ ${(stats.todaysRevenue / 100).toFixed(2)}`}
+          subtitle="Since midnight (Paid only)"
+          icon={<FiDollarSign className="w-5 h-5 text-emerald-600" />}
+        />
+        <StatCard
+          title="7-Day Volume"
+          value={stats.last7DaysOrders}
+          subtitle="Orders this week"
+          icon={<FiShoppingBag className="w-5 h-5 text-blue-600" />}
+        />
+        <StatCard
+          title="Failed Payments"
+          value={stats.failedPayments}
+          subtitle="Requires attention"
+          icon={<FiAlertCircle className="w-5 h-5 text-red-500" />}
+        />
+        <StatCard
+          title="Action Required"
+          value={stats.pendingOrders}
+          subtitle="Pending / Processing"
+          icon={<FiClock className="w-5 h-5 text-amber-600" />}
+        />
+      </div>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
