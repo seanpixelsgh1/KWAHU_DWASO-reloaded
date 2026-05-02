@@ -127,8 +127,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET method for admin to list products (Optional but helpful)
-export async function GET() {
+// GET method for admin to list products
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     const isDev = process.env.NODE_ENV === "development";
@@ -146,10 +146,37 @@ export async function GET() {
       .limit(100)
       .get();
 
-    const products = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    const products = snapshot.docs.map(doc => {
+      const data = doc.data();
+      
+      // Safely serialize timestamps
+      let createdAtIso = new Date().toISOString();
+      if (data.createdAt) {
+        if (typeof data.createdAt.toDate === "function") {
+          createdAtIso = data.createdAt.toDate().toISOString();
+        } else if (typeof data.createdAt === "string" || typeof data.createdAt === "number") {
+          const parsed = new Date(data.createdAt);
+          if (!isNaN(parsed.getTime())) createdAtIso = parsed.toISOString();
+        }
+      }
+
+      let updatedAtIso = createdAtIso;
+      if (data.updatedAt) {
+        if (typeof data.updatedAt.toDate === "function") {
+          updatedAtIso = data.updatedAt.toDate().toISOString();
+        } else if (typeof data.updatedAt === "string" || typeof data.updatedAt === "number") {
+          const parsed = new Date(data.updatedAt);
+          if (!isNaN(parsed.getTime())) updatedAtIso = parsed.toISOString();
+        }
+      }
+
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: createdAtIso,
+        updatedAt: updatedAtIso,
+      };
+    });
 
     return NextResponse.json({
       success: true,
