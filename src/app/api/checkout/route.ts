@@ -146,7 +146,7 @@ export const POST = async (request: NextRequest) => {
 
     const paystackPayload = {
       email: email,
-      amount: Math.round(total * 100), // Convert to pesewas/kobo
+      amount: Math.round(total), // Prices are already in pesewas/kobo
       reference: finalOrderId,
       callback_url: callbackUrl,
     };

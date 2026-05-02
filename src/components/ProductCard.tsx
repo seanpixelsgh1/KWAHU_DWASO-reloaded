@@ -21,9 +21,9 @@ const ProductCard = ({ product }: Props) => {
   const { favorite } = useSelector((state: StateType) => state?.kwahudwaso);
   const [isFavorite, setIsFavorite] = useState(false);
 
-  const regularPrice = product?.price;
-  const discountedPrice =
-    product?.price - (product?.price * product?.discountPercentage) / 100;
+  const regularPrice = product.price || 0;
+  const discount = product.discountPercentage || 0;
+  const discountedPrice = regularPrice - (regularPrice * discount) / 100;
 
   // Check if product is in favorites
   useEffect(() => {
@@ -46,37 +46,39 @@ const ProductCard = ({ product }: Props) => {
     }
   };
 
+  const fakeRating = 4.5; // fallback since rating is gone
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl hover:shadow-xl hover:shadow-black/10 transition-all duration-300 overflow-hidden group transform hover:-translate-y-1 relative">
       {/* Image Section */}
       <div className="relative aspect-square overflow-hidden bg-gray-50">
         <Link
           href={{
-            pathname: `/products/${product?.id}`,
-            query: { id: product?.id },
+            pathname: `/products/${product.id}`,
+            query: { id: product.id },
           }}
         >
           <img
-            src={product?.images[0]}
-            alt={product?.title}
+            src={product.images?.[0] || ""}
+            alt={product.name}
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
         </Link>
 
-        {product?.discountPercentage > 0 && (
+        {discount > 0 && (
           <div className="absolute top-3 left-3 bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg z-10 animate-pulse">
-            -{Math.round(product.discountPercentage)}% OFF
+            -{Math.round(discount)}% OFF
           </div>
         )}
 
         {/* Stock Badge */}
-        {product?.stock <= 5 && product?.stock > 0 && (
+        {product.stock <= 5 && product.stock > 0 && (
           <div className="absolute top-3 right-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold shadow-lg">
             Only {product.stock} left!
           </div>
         )}
 
-        {product?.stock === 0 && (
+        {product.stock === 0 && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <div className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg">
               OUT OF STOCK
@@ -111,9 +113,9 @@ const ProductCard = ({ product }: Props) => {
       <div className="p-5">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">
-            {product?.category}
+            {product.category}
           </p>
-          {product?.brand && (
+          {product.brand && (
             <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full font-medium">
               {product.brand}
             </span>
@@ -122,12 +124,12 @@ const ProductCard = ({ product }: Props) => {
 
         <Link
           href={{
-            pathname: `/products/${product?.id}`,
-            query: { id: product?.id },
+            pathname: `/products/${product.id}`,
+            query: { id: product.id },
           }}
         >
           <h3 className="font-semibold text-gray-900 hover:text-blue-600 transition-colors line-clamp-1 mb-3 leading-tight">
-            {product?.title}
+            {product.name}
           </h3>
         </Link>
 
@@ -139,7 +141,7 @@ const ProductCard = ({ product }: Props) => {
                 <FaStar
                   key={i}
                   className={`w-3.5 h-3.5 ${
-                    i < Math.floor(product?.rating)
+                    i < Math.floor(fakeRating)
                       ? "text-yellow-400"
                       : "text-gray-300"
                   }`}
@@ -147,11 +149,11 @@ const ProductCard = ({ product }: Props) => {
               ))}
             </div>
             <span className="text-xs text-gray-600 ml-1">
-              ({product?.rating})
+              ({fakeRating})
             </span>
           </div>
 
-          {product?.stock > 0 && (
+          {product.stock > 0 && (
             <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full font-medium">
               In Stock
             </span>

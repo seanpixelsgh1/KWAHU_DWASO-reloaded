@@ -2,34 +2,36 @@
 import { useEffect, useState } from "react";
 import PriceFormat from "./PriceFormat";
 import { useSelector } from "react-redux";
-import { ProductType, StateType } from "../../type";
+import { CartItem, ProductType, StateType } from "../../type";
 
 const ProductPrice = ({ regularPrice, discountedPrice, product }: any) => {
-  const [existingProduct, setExistingProduct] = useState<ProductType | null>(
-    null
-  );
+  const [existingItem, setExistingItem] = useState<CartItem | null>(null);
   const { cart } = useSelector((state: StateType) => state?.kwahudwaso);
+  
   useEffect(() => {
-    const availableProduct = cart?.find((item) => item?.id === product?.id);
+    const availableProduct = cart?.find((item) => item?.productId === product?.id);
     if (availableProduct) {
-      setExistingProduct(availableProduct);
+      setExistingItem(availableProduct);
+    } else {
+      setExistingItem(null);
     }
   }, [cart, product]);
+
   return (
     <div className="flex items-center gap-2">
       <PriceFormat
         className="font-semibold text-sky-color"
         amount={
-          existingProduct
-            ? discountedPrice * existingProduct?.quantity!
+          existingItem
+            ? discountedPrice * existingItem.quantity
             : discountedPrice
         }
       />
       <PriceFormat
         className="text-gray-500 line-through font-normal"
         amount={
-          existingProduct
-            ? regularPrice * existingProduct?.quantity!
+          existingItem
+            ? regularPrice * existingItem.quantity
             : regularPrice
         }
       />

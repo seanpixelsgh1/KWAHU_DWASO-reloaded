@@ -1,7 +1,7 @@
 import Container from "@/components/Container";
 import EnhancedProductsSideNav from "@/components/products/EnhancedProductsSideNav";
-import { getData } from "../helpers";
 import InfiniteProductList from "@/components/products/InfiniteProductList";
+import { getAllProducts, getCategories } from "@/lib/products";
 import {
   getBestSellers,
   getNewArrivals,
@@ -30,19 +30,19 @@ const ProductsPage = async ({ searchParams }: Props) => {
   // Await searchParams for Next.js 15 compatibility
   const params = await searchParams;
 
-  // Fetch all products and categories
-  const [productsData, categoriesData] = await Promise.all([
-    getData(`https://dummyjson.com/products?limit=0`),
-    getData(`https://dummyjson.com/products/categories`),
+  // Fetch all products and categories from our Firebase service
+  const [allFetchedProducts, categoriesData] = await Promise.all([
+    getAllProducts(),
+    getCategories(),
   ]);
 
-  let { products } = productsData;
-  const allProducts = [...products]; // Keep original for filters
+  let products = [...allFetchedProducts];
+  const allProducts = [...allFetchedProducts]; // Keep original for filters
 
   // Extract unique brands from all products
   const uniqueBrands = [
-    ...new Set(allProducts.map((product: any) => product.brand)),
-  ].sort();
+    ...new Set(allProducts.map((product) => product.brand).filter(Boolean)),
+  ].sort() as string[];
 
   // Apply filters
   if (params.category) {
@@ -69,34 +69,27 @@ const ProductsPage = async ({ searchParams }: Props) => {
   // Filter by brand
   if (params.brand) {
     products = products.filter(
-      (product: any) =>
+      (product) =>
         product.brand &&
         product.brand.toLowerCase().includes(params.brand!.toLowerCase())
     );
   }
 
-  // Filter by price range
+  // Filter by price range (pesewas)
   if (params.min_price || params.max_price) {
-    const minPrice = params.min_price ? parseFloat(params.min_price) : 0;
-    const maxPrice = params.max_price ? parseFloat(params.max_price) : Infinity;
+    const minPrice = params.min_price ? parseFloat(params.min_price) * 100 : 0;
+    const maxPrice = params.max_price ? parseFloat(params.max_price) * 100 : Infinity;
     products = products.filter(
-      (product: any) => product.price >= minPrice && product.price <= maxPrice
+      (product) => product.price >= minPrice && product.price <= maxPrice
     );
   }
 
   // Filter by color
   if (params.color) {
-    products = products.filter((product: any) => {
+    products = products.filter((product) => {
       const colorLower = params.color!.toLowerCase();
-      // Check in tags
-      if (product.tags && Array.isArray(product.tags)) {
-        const hasColorInTags = product.tags.some((tag: string) =>
-          tag.toLowerCase().includes(colorLower)
-        );
-        if (hasColorInTags) return true;
-      }
-      // Check in title
-      return product.title.toLowerCase().includes(colorLower);
+      // Check in title/name
+      return (product.name || "").toLowerCase().includes(colorLower);
     });
   }
 

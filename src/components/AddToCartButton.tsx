@@ -6,7 +6,7 @@ import {
   increaseQuantity,
 } from "@/redux/shofySlice";
 import { useDispatch, useSelector } from "react-redux";
-import { ProductType, StateType } from "../../type";
+import { ProductType, CartItem, StateType } from "../../type";
 import toast from "react-hot-toast";
 import { FaPlus, FaCheck } from "react-icons/fa6";
 import { FaMinus, FaShoppingCart } from "react-icons/fa";
@@ -30,47 +30,44 @@ const AddToCartButton = ({
 }: PropsType) => {
   const dispatch = useDispatch();
   const { cart } = useSelector((state: StateType) => state?.kwahudwaso);
-  const [existingProduct, setExistingProduct] = useState<ProductType | null>(
-    null
-  );
+  const [existingItem, setExistingItem] = useState<CartItem | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
   useEffect(() => {
-    const availableProduct = cart?.find((item) => item?.id === product?.id);
-    if (availableProduct) {
-      setExistingProduct(availableProduct);
-    } else {
-      setExistingProduct(null);
-    }
+    const found = cart?.find((item) => item.productId === product?.id);
+    setExistingItem(found || null);
   }, [cart, product]);
 
   const handleAddToCart = async () => {
     if (product && product.stock > 0) {
       setIsAdding(true);
-      dispatch(addToCart(product));
 
-      // Simulate async operation
+      // Dispatch lean CartItem — NOT full product
+      const cartItem: CartItem = {
+        productId: product.id,
+        quantity: 1,
+        name: product.name,
+        image: product.images?.[0] || "",
+        price: product.price, // pesewas (UI snapshot only)
+      };
+      dispatch(addToCart(cartItem));
+
       setTimeout(() => {
         setIsAdding(false);
         setJustAdded(true);
-        toast.success(`${product?.title.substring(0, 15)}... added to cart!`, {
-          duration: 2000,
-          style: {
-            background: "#10B981",
-            color: "white",
-          },
-        });
-
-        // Reset the "just added" state
+        toast.success(
+          `${product.name.substring(0, 15)}... added to cart!`,
+          {
+            duration: 2000,
+            style: { background: "#10B981", color: "white" },
+          }
+        );
         setTimeout(() => setJustAdded(false), 2000);
       }, 300);
     } else {
       toast.error("Product is out of stock!", {
-        style: {
-          background: "#EF4444",
-          color: "white",
-        },
+        style: { background: "#EF4444", color: "white" },
       });
     }
   };
@@ -79,29 +76,20 @@ const AddToCartButton = ({
     dispatch(increaseQuantity(product?.id));
     toast.success(`Quantity increased!`, {
       duration: 1500,
-      style: {
-        background: "#10B981",
-        color: "white",
-      },
+      style: { background: "#10B981", color: "white" },
     });
   };
 
   const handleDecrease = () => {
-    if (existingProduct?.quantity! > 1) {
+    if (existingItem && existingItem.quantity > 1) {
       dispatch(decreaseQuantity(product?.id));
       toast.success(`Quantity decreased!`, {
         duration: 1500,
-        style: {
-          background: "#F59E0B",
-          color: "white",
-        },
+        style: { background: "#F59E0B", color: "white" },
       });
     } else {
       toast.error("Minimum quantity is 1", {
-        style: {
-          background: "#EF4444",
-          color: "white",
-        },
+        style: { background: "#EF4444", color: "white" },
       });
     }
   };
@@ -137,10 +125,10 @@ const AddToCartButton = ({
 
   return (
     <>
-      {existingProduct && showQuantity ? (
+      {existingItem && showQuantity ? (
         <div className="flex items-center justify-center gap-2 bg-white rounded-lg border border-gray-200 p-1 shadow-sm">
           <button
-            disabled={existingProduct?.quantity! <= 1}
+            disabled={existingItem.quantity <= 1}
             onClick={handleDecrease}
             className="flex items-center justify-center w-8 h-8 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-md border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 disabled:hover:text-gray-600"
           >
@@ -149,14 +137,14 @@ const AddToCartButton = ({
 
           <div className="flex flex-col items-center min-w-[40px]">
             <span className="text-sm font-semibold text-gray-800">
-              {existingProduct?.quantity}
+              {existingItem.quantity}
             </span>
             <span className="text-xs text-gray-500">in cart</span>
           </div>
 
           <button
             onClick={handleIncrease}
-            disabled={existingProduct?.quantity! >= (product?.stock || 0)}
+            disabled={existingItem.quantity >= (product?.stock || 0)}
             className="flex items-center justify-center w-8 h-8 bg-gray-100 hover:bg-green-100 text-gray-600 hover:text-green-600 rounded-md border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FaPlus className="w-3 h-3" />

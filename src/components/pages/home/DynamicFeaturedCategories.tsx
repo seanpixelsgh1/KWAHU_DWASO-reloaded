@@ -1,6 +1,5 @@
 import React from "react";
-import { getData } from "@/app/(user)/helpers";
-import { getCategoriesWithCounts } from "@/app/(user)/helpers/productHelpers";
+import { getCategories } from "@/lib/products";
 import RoundedCategoriesCarousel from "./RoundedCategoriesCarousel";
 
 // Category images mapping
@@ -82,13 +81,10 @@ const categoryDescriptions: { [key: string]: string } = {
   "womens-watches": "Elegant watches for women",
 };
 
-interface ApiCategory {
+interface EnhancedCategory {
   slug: string;
   name: string;
   url: string;
-}
-
-interface EnhancedCategory extends ApiCategory {
   image: string;
   itemCount: number;
   description: string;
@@ -96,33 +92,22 @@ interface EnhancedCategory extends ApiCategory {
 
 const DynamicFeaturedCategories: React.FC = async () => {
   try {
-    // Fetch categories and all products data
-    const [categoriesData, allProductsData] = await Promise.all([
-      getData(`https://dummyjson.com/products/categories`),
-      getData(`https://dummyjson.com/products?limit=0`), // Fetch all products
-    ]);
-
-    // Get categories with product counts
-    const categoriesWithCounts = getCategoriesWithCounts(
-      allProductsData?.products || []
-    );
+    const categoriesData = await getCategories();
 
     // Enhance categories with images, descriptions, and counts
     const enhancedCategories: EnhancedCategory[] =
       categoriesData
         ?.slice(0, 12) // Take max 12 categories for homepage
-        ?.map((category: ApiCategory) => {
+        ?.map((category) => {
           const categorySlug = category.slug;
-          const categoryCount =
-            categoriesWithCounts.find((c) => c.slug === categorySlug)?.count ||
-            0;
 
           return {
             ...category,
+            url: `/products?category=${categorySlug}`,
             image:
               categoryImages[categorySlug] ||
               "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop&crop=center",
-            itemCount: categoryCount,
+            itemCount: category.count,
             description:
               categoryDescriptions[categorySlug] ||
               `Discover amazing ${category.name} products`,

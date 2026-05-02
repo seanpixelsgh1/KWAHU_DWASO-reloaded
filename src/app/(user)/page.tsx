@@ -3,7 +3,7 @@ import ProductSection from "@/components/pages/home/ProductSection";
 import DynamicFeaturedCategories from "@/components/pages/home/DynamicFeaturedCategories";
 import SpecialOffersBanner from "@/components/pages/home/SpecialOffersBanner";
 import SectionDivider from "@/components/ui/SectionDivider";
-import { getData } from "./helpers";
+import { getAllProducts } from "@/lib/products";
 import {
   getBestSellers,
   getNewArrivals,
@@ -11,9 +11,7 @@ import {
 } from "./helpers/productHelpers";
 
 export default async function Home() {
-  const endpoint = `https://dummyjson.com/products?limit=0`; // Fetch all products
-  const productData = await getData(endpoint);
-  const allProducts = productData?.products || [];
+  const allProducts = await getAllProducts();
 
   // Categorize products
   const bestSellers = getBestSellers(allProducts);

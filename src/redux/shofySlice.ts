@@ -1,9 +1,9 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { ProductType } from "../../type";
+import { CartItem, ProductType } from "../../type";
 import { FirestoreUser } from "@/lib/firebase/userService";
 
 interface InitialState {
-  cart: ProductType[];
+  cart: CartItem[];
   favorite: ProductType[];
   userInfo: FirestoreUser | null;
 }
@@ -19,45 +19,48 @@ export const shofySlice = createSlice({
   initialState,
   reducers: {
     addToCart: (state, action) => {
-      const existingProduct = state?.cart?.find(
-        (item) => item?.id === action.payload?.id
+      const item: CartItem = action.payload;
+      const existing = state.cart.find(
+        (c) => c.productId === item.productId
       );
-      if (existingProduct) {
-        existingProduct.quantity! += 1;
+      if (existing) {
+        existing.quantity += 1;
       } else {
-        state.cart.push({ ...action.payload, quantity: 1 });
+        state.cart.push({ ...item, quantity: item.quantity || 1 });
       }
     },
     increaseQuantity: (state, action) => {
-      const existingProduct = state?.cart?.find(
-        (item) => item?.id === action.payload
+      const existing = state.cart.find(
+        (c) => c.productId === action.payload
       );
-      if (existingProduct) {
-        existingProduct.quantity! += 1;
+      if (existing) {
+        existing.quantity += 1;
       }
     },
     decreaseQuantity: (state, action) => {
-      const existingProduct = state?.cart?.find(
-        (item) => item?.id === action.payload
+      const existing = state.cart.find(
+        (c) => c.productId === action.payload
       );
-      if (existingProduct) {
-        existingProduct.quantity! -= 1;
+      if (existing) {
+        existing.quantity -= 1;
       }
     },
     removeFromCart: (state, action) => {
-      state.cart = state.cart.filter((item) => item?.id !== action.payload);
+      state.cart = state.cart.filter(
+        (c) => c.productId !== action.payload
+      );
     },
     resetCart: (state) => {
       state.cart = [];
     },
-    // Favorite cart
+    // Favorite (still uses full ProductType for UI display)
     addToFavorite: (state, action) => {
-      const existingProduct = state?.favorite?.find(
-        (item) => item?.id === action.payload?.id
+      const existingProduct = state.favorite.find(
+        (item) => item.id === action.payload.id
       );
       if (existingProduct) {
         state.favorite = state.favorite.filter(
-          (item) => item?.id !== action.payload.id
+          (item) => item.id !== action.payload.id
         );
       } else {
         state.favorite.push(action.payload);

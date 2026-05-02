@@ -1,49 +1,42 @@
 import { UserRole, OrderStatus } from "@/lib/rbac/roles";
 
-type Review = {
-  reviewerName: string;
-  rating: number;
-  comment: string;
-  reviewerEmail: string;
-};
+// ─────────────────────────────────────────────
+// PRODUCT (Firestore-aligned schema)
+// ─────────────────────────────────────────────
 export interface ProductType {
-  availabilityStatus: string;
-  brand: string;
-  category: string;
-  description: string;
-  dimensions: {
-    depth: number;
-    height: number;
-    width: number;
-  };
-  discountPercentage: number;
-  id: number;
-  images: string[];
-  meta: {
-    createdAt: string;
-    updatedAt: string;
-    barcode: string;
-    qrCode: string;
-  };
-  minimumOrderQuantity: number;
-  price: number;
-  rating: number;
-  returnPolicy: string;
-  reviews: Review[];
-  shippingInformation: string;
-  sku: string;
+  id: string;
+  name: string;
+  description?: string;
+  price: number; // integer (pesewas) — divide by 100 for display
   stock: number;
-  tags: string[];
-  thumbnail: string;
-  title: string;
-  warrantyInformation: string;
-  weight: number;
-  quantity?: number;
+  reserved: number;
+  images: string[];
+  category?: string;
+  brand?: string;
+  discountPercentage?: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
+// ─────────────────────────────────────────────
+// CART ITEM (lean — never trust for checkout)
+// ─────────────────────────────────────────────
+export interface CartItem {
+  productId: string;
+  quantity: number;
+  // UI snapshot only — backend ignores these:
+  name: string;
+  image: string;
+  price: number; // pesewas (display only, never sent to checkout)
+}
+
+// ─────────────────────────────────────────────
+// GLOBAL STATE
+// ─────────────────────────────────────────────
 export interface StateType {
-  shopy: {
-    cart: ProductType[];
+  kwahudwaso: {
+    cart: CartItem[];
     favorite: ProductType[];
     userInfo: any;
   };

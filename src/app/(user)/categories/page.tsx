@@ -1,7 +1,6 @@
 import Container from "@/components/Container";
 import InfiniteCategoryGrid from "@/components/pages/categories/InfiniteCategoryGrid";
-import { getData } from "../helpers";
-import { getCategoriesWithCounts } from "../helpers/productHelpers";
+import { getCategories, getAllProducts } from "@/lib/products";
 import { Metadata } from "next";
 import Link from "next/link";
 
@@ -33,24 +32,15 @@ export const metadata: Metadata = {
 };
 
 export default async function CategoriesPage() {
-  // Fetch categories and all products data
-  const [categoriesData, allProductsData] = await Promise.all([
-    getData(`https://dummyjson.com/products/categories`),
-    getData(`https://dummyjson.com/products?limit=0`), // Fetch all products
+  const [categoriesData, allProducts] = await Promise.all([
+    getCategories(),
+    getAllProducts(),
   ]);
 
-  // Get categories with product counts
-  const categoriesWithCounts = getCategoriesWithCounts(
-    allProductsData?.products || []
-  );
-
-  // Combine API categories with counts
-  const enrichedCategories =
-    categoriesData?.map((category: any) => ({
-      ...category,
-      count:
-        categoriesWithCounts.find((c) => c.slug === category.slug)?.count || 0,
-    })) || [];
+  const enrichedCategories = categoriesData.map((cat) => ({
+    ...cat,
+    url: `/products?category=${cat.slug}`,
+  }));
 
   return (
     <Container className="py-10">
@@ -81,7 +71,7 @@ export default async function CategoriesPage() {
       {/* Categories Grid */}
       <InfiniteCategoryGrid
         initialCategories={enrichedCategories}
-        totalProducts={allProductsData?.total || 0}
+        totalProducts={allProducts.length}
       />
     </Container>
   );

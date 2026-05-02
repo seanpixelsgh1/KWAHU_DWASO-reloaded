@@ -1,9 +1,9 @@
 import Container from "@/components/Container";
-import { getData } from "../helpers";
 import OffersHero from "@/components/pages/offers/OffersHero";
 import { ProductType } from "../../../../type";
 import OffersList from "@/components/pages/offers/OffersList";
 import Link from "next/link";
+import { getAllProducts } from "@/lib/products";
 
 export const metadata = {
   title: "Special Offers - Kwahu Dwaso",
@@ -24,29 +24,28 @@ const OffersPage = async ({ searchParams }: OffersPageProps) => {
   const params = await searchParams;
 
   // Fetch all products
-  const productsData = await getData(`https://dummyjson.com/products?limit=0`);
-  let { products } = productsData;
+  const allProducts = await getAllProducts();
 
   // Filter products with offers (discount > 0)
-  const offersProducts = products.filter(
-    (product: ProductType) => product.discountPercentage > 0
+  const offersProducts = allProducts.filter(
+    (product) => (product.discountPercentage || 0) > 0
   );
+
+  let products = [...offersProducts];
 
   // Apply additional filters
   if (params.category) {
     products = offersProducts.filter(
-      (product: ProductType) =>
-        product.category.toLowerCase() === params.category!.toLowerCase()
+      (product) =>
+        (product.category || "").toLowerCase() === params.category!.toLowerCase()
     );
-  } else {
-    products = offersProducts;
   }
 
   // Filter by minimum discount percentage
   if (params.min_discount) {
     const minDiscount = parseFloat(params.min_discount);
     products = products.filter(
-      (product: ProductType) => product.discountPercentage >= minDiscount
+      (product) => (product.discountPercentage || 0) >= minDiscount
     );
   }
 
@@ -55,64 +54,68 @@ const OffersPage = async ({ searchParams }: OffersPageProps) => {
     switch (params.sort) {
       case "discount-high":
         products.sort(
-          (a: ProductType, b: ProductType) =>
-            b.discountPercentage - a.discountPercentage
+          (a, b) =>
+            (b.discountPercentage || 0) - (a.discountPercentage || 0)
         );
         break;
       case "discount-low":
         products.sort(
-          (a: ProductType, b: ProductType) =>
-            a.discountPercentage - b.discountPercentage
+          (a, b) =>
+            (a.discountPercentage || 0) - (b.discountPercentage || 0)
         );
         break;
       case "price-low":
-        products.sort((a: ProductType, b: ProductType) => a.price - b.price);
+        products.sort((a, b) => a.price - b.price);
         break;
       case "price-high":
-        products.sort((a: ProductType, b: ProductType) => b.price - a.price);
+        products.sort((a, b) => b.price - a.price);
         break;
       case "name-asc":
-        products.sort((a: ProductType, b: ProductType) =>
-          a.title.localeCompare(b.title)
+        products.sort((a, b) =>
+          (a.name || "").localeCompare(b.name || "")
         );
         break;
       case "rating":
+        // Fallback for rating sort, maybe use stock or date
         products.sort(
-          (a: ProductType, b: ProductType) => (b.rating || 0) - (a.rating || 0)
+          (a, b) => b.stock - a.stock
         );
         break;
       default:
         // Default: highest discount first
         products.sort(
-          (a: ProductType, b: ProductType) =>
-            b.discountPercentage - a.discountPercentage
+          (a, b) =>
+            (b.discountPercentage || 0) - (a.discountPercentage || 0)
         );
         break;
     }
   } else {
     // Default sorting by highest discount
     products.sort(
-      (a: ProductType, b: ProductType) =>
-        b.discountPercentage - a.discountPercentage
+      (a, b) =>
+        (b.discountPercentage || 0) - (a.discountPercentage || 0)
     );
   }
 
   // Get categories for filtering
   const categories = [
-    ...new Set(offersProducts.map((p: ProductType) => p.category)),
+    ...new Set(offersProducts.map((p) => p.category).filter(Boolean)),
   ] as string[];
 
   // Calculate savings statistics
   const totalProducts = offersProducts.length;
   const averageDiscount =
-    offersProducts.reduce(
-      (sum: number, product: ProductType) => sum + product.discountPercentage,
-      0
-    ) / totalProducts;
+    totalProducts > 0
+      ? offersProducts.reduce(
+          (sum, product) => sum + (product.discountPercentage || 0),
+          0
+        ) / totalProducts
+      : 0;
 
-  const maxDiscount = Math.max(
-    ...offersProducts.map((p: ProductType) => p.discountPercentage)
-  );
+  const maxDiscount =
+    totalProducts > 0
+      ? Math.max(...offersProducts.map((p) => p.discountPercentage || 0))
+      : 0;
 
   return (
     <Container className="py-10">

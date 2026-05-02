@@ -16,19 +16,21 @@ type CurrencyCode =
   | "GHS";
 
 interface Props {
-  amount?: number;
+  amount?: number; // integer (pesewas/cents)
   className?: string;
   fromCurrency?: CurrencyCode;
 }
 
 const PriceFormat = ({ amount, className, fromCurrency = "GHS" }: Props) => {
-  console.log("PriceFormat input:", amount, "from:", fromCurrency);
   const { selectedCurrency, convertPrice } = useCurrency();
 
-  if (!amount)
+  if (amount === undefined || amount === null)
     return <span className={twMerge("font-medium", className)}>-</span>;
 
-  const convertedAmount = convertPrice(amount, fromCurrency);
+  // Amount is in integer (e.g. 1050 pesewas) -> divide by 100 to get decimal
+  const displayAmount = amount / 100;
+
+  const convertedAmount = convertPrice(displayAmount, fromCurrency);
 
   // Currencies that don't use decimal places
   const noDecimalCurrencies = ["JPY", "BDT"];
