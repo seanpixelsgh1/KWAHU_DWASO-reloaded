@@ -29,21 +29,31 @@ function isValidImageUrl(url: string) {
   return /^https?:\/\/.+\.(jpg|jpeg|png|webp)$/i.test(url);
 }
 
-export default function ProductForm() {
+interface ProductFormProps {
+  initialData?: any;
+  onSuccess?: () => void;
+  onCancel?: () => void;
+}
+
+export default function ProductForm({ initialData, onSuccess, onCancel }: ProductFormProps) {
+  const isEditing = !!initialData;
+  
   // 1. Form State
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    price: "",
-    stock: "",
-    category: "",
+    name: initialData?.name || "",
+    description: initialData?.description || "",
+    price: initialData?.price ? (initialData.price / 100).toString() : "",
+    stock: initialData?.stock?.toString() || "",
+    category: initialData?.category || "",
   });
 
   // 2. Media State
-  const [imageMode, setImageMode] = useState<"upload" | "url">("upload");
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageMode, setImageMode] = useState<"upload" | "url">(
+    initialData?.imageSource || (initialData?.images?.[0] ? "url" : "upload")
+  );
+  const [imageUrl, setImageUrl] = useState(initialData?.images?.[0] || "");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(initialData?.images?.[0] || null);
 
   // 3. Status State
   const [error, setError] = useState<string | null>(null);
@@ -165,17 +175,24 @@ export default function ProductForm() {
         throw new Error("Please upload an image or provide an image URL");
       }
 
-      // 3. Step 2: Create Product in Firestore
+      // 3. Step 2: Create or Update Product in Firestore
       toast.loading("Saving product details...", { id: toastId });
       const productPayload = {
         ...formData,
+        price: Math.round(Number(formData.price) * 100), // Convert to pesewas
         images: [finalImageUrl],
         imageSource: selectedFile ? "upload" : "url",
         imagePath: finalImagePath, // Atomic-safe metadata
       };
 
-      const productRes = await fetch("/api/admin/products", {
-        method: "POST",
+      const url = isEditing 
+        ? `/api/admin/products/${initialData.id}` 
+        : "/api/admin/products";
+        
+      const method = isEditing ? "PATCH" : "POST";
+
+      const productRes = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(productPayload),
       });
@@ -186,8 +203,9 @@ export default function ProductForm() {
       }
 
       // 4. Success Handling
-      toast.success("Product created successfully!", { id: toastId });
-      resetForm();
+      toast.success(`Product ${isEditing ? 'updated' : 'created'} successfully!`, { id: toastId });
+      if (!isEditing) resetForm();
+      if (onSuccess) onSuccess();
     } catch (err) {
       console.error("Submission Error:", err);
       const message = err instanceof Error ? err.message : "An unexpected error occurred";
@@ -205,8 +223,12 @@ export default function ProductForm() {
       <div className="flex items-center mb-8 pb-4 border-b border-gray-100">
         <FiPackage className="text-3xl text-indigo-600 mr-4" />
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Add New Product</h2>
-          <p className="text-sm text-gray-500">Create a production-grade listing for Kwahu Dwaso</p>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {isEditing ? "Edit Product" : "Add New Product"}
+          </h2>
+          <p className="text-sm text-gray-500">
+            {isEditing ? "Update your product details" : "Create a production-grade listing for Kwahu Dwaso"}
+          </p>
         </div>
       </div>
 
@@ -443,15 +465,15 @@ export default function ProductForm() {
           <button
             type="button"
             onClick={() => {
-              setFormData({ name: "", description: "", price: "", stock: "", category: "" });
-              setImageUrl("");
-              setSelectedFile(null);
-              setPreview(null);
-              setError(null);
+              if (onCancel) {
+                onCancel();
+              } else {
+                resetForm();
+              }
             }}
             className="px-6 py-3 border border-gray-300 text-gray-600 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
           >
-            Reset Form
+            {onCancel ? "Cancel" : "Reset Form"}
           </button>
         </div>
       </form>

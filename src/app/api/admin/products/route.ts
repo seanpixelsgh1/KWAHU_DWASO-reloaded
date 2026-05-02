@@ -84,8 +84,9 @@ export async function POST(request: NextRequest) {
     const productData = {
       name: name.trim(),
       description: (description || "").trim(),
-      price: numericPrice,
-      stock: Number(stock) || 0,
+      price: Math.round(numericPrice), // Enforce integer
+      stock: Math.round(Number(stock)) || 0,
+      reserved: 0, // Ensure reserved starts at 0
       category: category.trim(),
       images: images, 
       imageSource: imageSource,
