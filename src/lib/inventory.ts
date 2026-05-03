@@ -1,5 +1,6 @@
 import { adminDb as db } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { sendLowStockAlert } from "@/lib/notifications/email";
 
 /**
  * Release reserved inventory for a pending order.
@@ -56,6 +57,11 @@ export async function confirmInventory(
   logPayload?: Record<string, any>,
   extraUpdates?: Record<string, any>
 ): Promise<void> {
+  const alertsToTrigger: Array<{
+    productRef: FirebaseFirestore.DocumentReference;
+    payload: { productId: string; name: string; available: number; threshold: number };
+  }> = [];
+
   await db.runTransaction(async (tx) => {
     const orderDoc = await tx.get(orderRef);
     const order = orderDoc.data();
@@ -83,10 +89,35 @@ export async function confirmInventory(
 
       if (!product) continue;
 
+      const newStock = Math.max(0, (product.stock || 0) - (item.quantity || 0));
+      const newReserved = Math.max(0, (product.reserved || 0) - (item.quantity || 0));
+      
       tx.update(productRef, {
-        stock: Math.max(0, (product.stock || 0) - (item.quantity || 0)),
-        reserved: Math.max(0, (product.reserved || 0) - (item.quantity || 0)),
+        stock: newStock,
+        reserved: newReserved,
       });
+
+      // ALERTS LOGIC (Compute post-update availability)
+      const available = newStock - newReserved;
+      const threshold = Number(product.lowStockThreshold || 5);
+      
+      if (available <= threshold && available > 0 && product.lowStockNotified !== true) {
+        // We will trigger the email AFTER the transaction succeeds to avoid sending multiple
+        // emails if the transaction retries. We just mark it notified inside the tx.
+        tx.update(productRef, {
+          lowStockNotified: true
+        });
+        
+        alertsToTrigger.push({
+          productRef,
+          payload: {
+            productId: item.productId,
+            name: product.name || "Unknown Product",
+            available,
+            threshold
+          }
+        });
+      }
     }
 
     tx.update(orderRef, {
@@ -108,4 +139,13 @@ export async function confirmInventory(
       });
     }
   });
+
+  // Trigger emails safely AFTER transaction succeeds
+  for (const alert of alertsToTrigger) {
+    try {
+      await sendLowStockAlert(alert.payload);
+    } catch (err) {
+      console.error("Failed to send low stock alert:", err);
+    }
+  }
 }

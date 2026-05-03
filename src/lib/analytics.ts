@@ -52,11 +52,11 @@ export async function getSalesOverTime(range: "7d" | "30d" | "12m") {
     createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(doc.data().createdAt)
   }));
 
-  const validOrders = orders.filter((o) => isValidOrder(o.status, o.paymentStatus));
+  const validOrders = orders.filter((o: any) => isValidOrder(o.status, o.paymentStatus));
 
   const grouped: Record<string, { revenue: number; orders: number }> = {};
 
-  validOrders.forEach((o) => {
+  validOrders.forEach((o: any) => {
     const date = o.createdAt;
     if (isNaN(date.getTime())) return;
 

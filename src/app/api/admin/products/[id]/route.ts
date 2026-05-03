@@ -71,9 +71,24 @@ export async function PATCH(
       body.price = price;
     }
 
-    body.updatedAt = FieldValue.serverTimestamp();
-
     const docRef = db.collection("products").doc(id);
+
+    // Phase 6: Reset Alert on Restock
+    if ("stock" in body) {
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        const data = docSnap.data();
+        const reserved = Number(data?.reserved || 0);
+        const threshold = Number(data?.lowStockThreshold || body.lowStockThreshold || 5);
+        const newAvailable = body.stock - reserved;
+        
+        if (newAvailable > threshold) {
+          body.lowStockNotified = false;
+        }
+      }
+    }
+
+    body.updatedAt = FieldValue.serverTimestamp();
     await docRef.update(body);
 
     return NextResponse.json({

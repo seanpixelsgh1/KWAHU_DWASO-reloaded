@@ -157,9 +157,20 @@ export default function AdminProductsClient() {
                     <PriceFormat amount={product.price} />
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.stock > 10 ? 'bg-green-100 text-green-800' : product.stock > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                      {product.stock}
-                    </span>
+                    <div className="flex flex-col gap-1 items-start">
+                      <span className="font-semibold text-gray-900">{product.stock} total</span>
+                      {(() => {
+                        const available = (product.stock || 0) - (product.reserved || 0);
+                        const threshold = product.lowStockThreshold || 5;
+                        if (available <= 0) {
+                          return <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap">🔴 Out of Stock</span>;
+                        } else if (available <= threshold) {
+                          return <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap">🟡 Low Stock</span>;
+                        } else {
+                          return <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap">🟢 Healthy</span>;
+                        }
+                      })()}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-orange-600 font-medium">
                     {product.reserved || 0}
