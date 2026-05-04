@@ -13,6 +13,8 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
+import { adminDb } from "@/lib/firebase/admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { UserRole } from "@/lib/rbac/roles";
 import { FORCE_PREMIUM } from "@/lib/constants/admin";
 import { formatDisplayName } from "@/lib/utils/user";
@@ -116,6 +118,7 @@ export const authConfig: NextAuthConfig = {
               updatedAt: new Date().toISOString(),
               emailVerified: true, // OAuth emails are verified by the provider
               role: "user",
+              isActive: true,
               provider: account.provider,
               profile: {
                 firstName: user.name?.split(" ")[0] || "",
@@ -135,6 +138,23 @@ export const authConfig: NextAuthConfig = {
           } else {
             // User exists, get their ID
             userId = querySnapshot.docs[0].id;
+
+            // Check if user is disabled
+            const existingUser = querySnapshot.docs[0].data();
+            if (existingUser.isActive === false) {
+              return false; // Block disabled users from signing in
+            }
+          }
+
+          // Track lastLoginAt using Admin SDK (server-side)
+          if (userId) {
+            try {
+              await adminDb.collection("users").doc(userId).update({
+                lastLoginAt: FieldValue.serverTimestamp(),
+              });
+            } catch (loginErr) {
+              console.error("Failed to update lastLoginAt:", loginErr);
+            }
           }
 
           // Store the Firestore document ID for later use
@@ -200,6 +220,13 @@ export const authConfig: NextAuthConfig = {
           const userDoc = await getDoc(doc(db, "users", session.user.id));
           if (userDoc.exists()) {
             const userData = userDoc.data();
+
+            // Block disabled users at session level
+            if (userData.isActive === false) {
+              session.user.role = "user" as UserRole; // Downgrade to prevent admin access
+              (session as any).isBlocked = true;
+            }
+
             session.user.role = (userData.role as UserRole) || "user";
             
             // Hardened fallback: prioritize firestore name, then session name, then email prefix

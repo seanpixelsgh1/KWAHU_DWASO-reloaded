@@ -2,9 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
 import { USER_ROLES } from "@/lib/rbac/permissions";
 import { FieldValue } from "firebase-admin/firestore";
+import { auth } from "@/auth";
+import { FORCE_PREMIUM } from "@/lib/constants/admin";
+
+async function isAuthorized() {
+  const session = await auth();
+  const isDev = process.env.NODE_ENV === "development";
+  return session?.user?.role === "admin" || (FORCE_PREMIUM && isDev);
+}
 
 export async function GET(request: NextRequest) {
   try {
+    if (!(await isAuthorized())) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
     // Fetch real users from Firebase using Admin SDK
     const usersSnapshot = await db.collection("users").get();
     const users = usersSnapshot.docs.map((doc) => {
@@ -12,7 +24,10 @@ export async function GET(request: NextRequest) {
       return {
         id: doc.id,
         ...data,
-        role: data?.role || "user", // Default to user role if not set
+        role: data?.role || "user",
+        isActive: data?.isActive !== false, // default to true
+        lastLoginAt: data?.lastLoginAt?.toDate?.()?.toISOString() || null,
+        createdAt: data?.createdAt?.toDate?.()?.toISOString() || data?.createdAt || null,
       };
     }) as any[];
 
@@ -28,7 +43,6 @@ export async function GET(request: NextRequest) {
 
     const usersWithOrderCount = users.map((user) => ({
       ...user,
-      role: user.role || "user", // Default to 'user' role if not set
       orders: orders.filter((order) => order.customerEmail === user.email)
         .length,
       totalSpent: orders
@@ -48,7 +62,11 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { userId, name, email, role } = await request.json();
+    if (!(await isAuthorized())) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    const { userId, name, email, role, isActive } = await request.json();
 
     if (!userId) {
       return NextResponse.json(
@@ -76,6 +94,7 @@ export async function PUT(request: NextRequest) {
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
     if (role !== undefined) updateData.role = role;
+    if (typeof isActive === "boolean") updateData.isActive = isActive;
 
     // Update user in Firebase using Admin SDK
     await db.collection("users").doc(userId).update(updateData);
@@ -95,16 +114,23 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    if (!(await isAuthorized())) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
     const { userId } = await request.json();
 
     if (!userId) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 });
     }
 
-    // Delete user from Firebase using Admin SDK
-    await db.collection("users").doc(userId).delete();
+    // Soft delete — deactivate instead of destroying data
+    await db.collection("users").doc(userId).update({
+      isActive: false,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: "User deactivated" });
   } catch (error) {
     console.error("API ERROR [admin-users-delete]:", error);
     return NextResponse.json(
