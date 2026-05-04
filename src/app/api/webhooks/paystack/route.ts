@@ -6,95 +6,66 @@ import { confirmInventory, releaseInventory } from "@/lib/inventory";
 
 async function processWebhookEvent(event: any) {
   try {
-    // 4. Handle Successful Payment
+    const data = event.data;
+    const reference = data?.reference;
+
+    if (!reference) {
+      console.error("WEBHOOK_ERROR", { type: "missing_reference", event: event.event });
+      return;
+    }
+
+    // 1. Lookup payment by reference
+    const paymentSnap = await db.collection("payments")
+      .where("paystackReference", "==", reference)
+      .limit(1)
+      .get();
+
+    if (paymentSnap.empty) {
+      console.error("WEBHOOK_ERROR", { type: "payment_not_found", reference });
+      return;
+    }
+
+    const paymentDoc = paymentSnap.docs[0];
+    const paymentData = paymentDoc.data();
+
+    // 2. Lookup linked order
+    const orderRef = db.collection("orders").doc(paymentData.orderId);
+    const orderDoc = await orderRef.get();
+
+    if (!orderDoc.exists) {
+      console.error("WEBHOOK_ERROR", { type: "order_not_found", orderId: paymentData.orderId });
+      return;
+    }
+
+    const orderData = orderDoc.data()!;
+
+    // 3. Handle Successful Payment
     if (event.event === "charge.success") {
-      const data = event.data;
-      const reference = data.reference;
-
-      // 5. Direct document lookup (O(1) — paymentReference === orderId)
-      const orderRef = db.collection("orders").doc(reference);
-      const orderDoc = await orderRef.get();
-
-      if (!orderDoc.exists) {
-        console.error("WEBHOOK_ERROR", { type: "order_not_found", reference });
+      // Idempotency Guard
+      if (paymentData.status === "success") {
+        console.log("WEBHOOK_INFO", { message: "Already processed", reference });
         return;
       }
 
-      const orderData = orderDoc.data()!;
-
-      // 6. Idempotency Protection (Outer Guard, inner guard is in confirmInventory)
-      if (orderData.paymentStatus === "paid") {
-        console.log("WEBHOOK_INFO", { message: "Already processed", orderId: orderDoc.id, reference });
-        return;
-      }
-
-      // Reference Ownership Check
-      if (orderData.paymentReference !== data.reference) {
-        console.error("WEBHOOK_ERROR", {
-          type: "reference_mismatch",
-          orderId: orderDoc.id,
-          expectedReference: orderData.paymentReference,
-          receivedReference: data.reference,
-        });
-        return;
-      }
-
-      // 7. Amount Validation (Anti-Tamper)
-      const expectedAmount = Number(orderData.amount) * 100;
-      if (isNaN(expectedAmount)) {
-        console.error("WEBHOOK_ERROR", { type: "invalid_order_amount", orderId: orderDoc.id });
-        return;
-      }
-
-      if (data.amount !== expectedAmount) {
-        console.error("WEBHOOK_ERROR", {
-          type: "amount_mismatch",
-          orderId: orderDoc.id,
-          reference: data.reference,
-          expected: expectedAmount,
-          received: data.amount,
-        });
-        return;
+      // Amount Validation (Anti-Tamper)
+      // Paystack sends amount in kobo/pesewas. payment.amount is also in pesewas.
+      if (data.amount !== paymentData.amount) {
+        throw new Error(`Amount mismatch — possible tampering. Expected ${paymentData.amount}, got ${data.amount}`);
       }
 
       // Currency Validation
-      if (data.currency?.toUpperCase() !== orderData.currency?.toUpperCase()) {
-        console.error("WEBHOOK_ERROR", {
-          type: "currency_mismatch",
-          orderId: orderDoc.id,
-          reference: data.reference,
-          expected: orderData.currency,
-          received: data.currency,
-        });
-        return;
+      if (data.currency?.toUpperCase() !== paymentData.currency?.toUpperCase()) {
+         throw new Error(`Currency mismatch. Expected ${paymentData.currency}, got ${data.currency}`);
       }
 
-      // Email Validation
-      if (data.customer?.email?.toLowerCase() !== orderData.email?.toLowerCase()) {
-        console.error("WEBHOOK_ERROR", {
-          type: "email_mismatch",
-          orderId: orderDoc.id,
-          reference: data.reference,
-          expected: orderData.email,
-          received: data.customer?.email,
-        });
-        return;
-      }
+      // Update payment doc
+      await paymentDoc.ref.update({
+        status: "success",
+        paidAt: FieldValue.serverTimestamp(),
+        paymentMethod: data.channel || "unknown",
+      });
 
-      // Expiry Guard — block late payments for expired orders
-      const now = new Date();
-      if (orderData.expiresAt && orderData.expiresAt.toDate() < now) {
-        console.error("WEBHOOK_ERROR", {
-          type: "expired_order_payment_attempt",
-          orderId: orderDoc.id,
-          reference: data.reference,
-        });
-        return;
-      }
-
-      // ─────────────────────────────────────────────
-      // 8. ATOMIC: Convert reservation → real stock deduction + mark paid
-      // ─────────────────────────────────────────────
+      // ATOMIC: Convert reservation → real stock deduction + mark paid
       const logPayload = {
         event: "payment_verified",
         message: "Payment successfully verified via webhook",
@@ -105,57 +76,28 @@ async function processWebhookEvent(event: any) {
 
       await confirmInventory(orderDoc.ref, data, logPayload);
 
-    } else if (event.event === "charge.failed") {
-      // ─────────────────────────────────────────────
-      // 10. ROLLBACK: Release reserved stock on payment failure
-      // ─────────────────────────────────────────────
-      const data = event.data;
-      const reference = data.reference;
-
-      // Guard against malformed events
-      if (!reference) {
-        console.error("WEBHOOK_ERROR", { type: "missing_reference_on_failure", event: event.event });
+    } else if (event.event === "charge.failed" || event.event === "charge.abandoned") {
+      // Idempotency Guard
+      if (paymentData.status === "failed" || paymentData.status === "abandoned" || paymentData.status === "success") {
         return;
       }
 
-      // Direct document lookup (O(1) — paymentReference === orderId)
-      const orderRef = db.collection("orders").doc(reference);
-      const orderDoc = await orderRef.get();
+      // Update payment doc
+      await paymentDoc.ref.update({
+        status: event.event === "charge.failed" ? "failed" : "abandoned",
+      });
 
-      if (orderDoc.exists) {
-        const orderData = orderDoc.data()!;
+      // ROLLBACK: Release reserved stock
+      const logPayload = {
+        event: "payment_failed",
+        message: "Payment failed or abandoned via webhook",
+        actor: "system",
+        level: "error",
+        meta: { source: "webhook", reference: data.reference, raw: data }
+      };
 
-        // Validate amount before release
-        const expectedAmount = Number(orderData.amount) * 100;
-        if (data.amount !== expectedAmount) {
-          console.error("WEBHOOK_ERROR", {
-            type: "failed_amount_mismatch",
-            orderId: orderDoc.id,
-            expected: expectedAmount,
-            received: data.amount,
-          });
-          return;
-        }
-
-        // Validate email before release
-        if (data.customer?.email?.toLowerCase() !== orderData.email?.toLowerCase()) {
-          console.error("WEBHOOK_ERROR", {
-            type: "failed_email_mismatch",
-            orderId: orderDoc.id,
-            expected: orderData.email,
-            received: data.customer?.email,
-          });
-          return;
-        }
-
-        const logPayload = {
-          event: "payment_failed",
-          message: "Payment failed via webhook",
-          actor: "system",
-          level: "error",
-          meta: { source: "webhook", reference: data.reference, raw: data }
-        };
-
+      // Only release if order is not already paid/processing
+      if (orderData.paymentStatus === "pending") {
         await releaseInventory(orderDoc.ref, logPayload);
       }
     }

@@ -50,6 +50,7 @@ export const POST = async (request: NextRequest) => {
     // 1. ATOMIC STOCK RESERVATION (Firestore Transaction)
     // ─────────────────────────────────────────────
     let total = 0;
+    const paymentReference = `${finalOrderId}_${Date.now()}`;
 
     await db.runTransaction(async (tx) => {
       // SERVER-SIDE PRICING: Compute total from Firestore (never trust client prices)
@@ -98,7 +99,7 @@ export const POST = async (request: NextRequest) => {
         status: "pending",
         paymentStatus: "pending",
         paymentProvider: "paystack",
-        paymentReference: finalOrderId, // C-1: Set atomically (same value sent to Paystack)
+        paymentReference: paymentReference, // C-1: Set atomically (same value sent to Paystack)
         ...(idempotencyKey ? { idempotencyKey } : {}),
         metadata: {
           source: "web",
@@ -130,6 +131,24 @@ export const POST = async (request: NextRequest) => {
           })),
         },
       });
+
+      // Phase 2: Create Payment Document
+      const paymentDocRef = db.collection("payments").doc();
+      tx.set(paymentDocRef, {
+        id: paymentDocRef.id,
+        orderId: finalOrderId,
+        userId: userId || null,
+        amount: Math.round(total), // in pesewas
+        currency: "GHS",
+        status: "pending",
+        paymentMethod: "unknown",
+        paystackReference: paymentReference,
+        createdAt: FieldValue.serverTimestamp(),
+        metadata: {
+          email: email,
+          channel: "unknown",
+        }
+      });
     });
 
     // ─────────────────────────────────────────────
@@ -147,7 +166,7 @@ export const POST = async (request: NextRequest) => {
     const paystackPayload = {
       email: email,
       amount: Math.round(total), // Prices are already in pesewas/kobo
-      reference: finalOrderId,
+      reference: paymentReference,
       callback_url: callbackUrl,
     };
 
