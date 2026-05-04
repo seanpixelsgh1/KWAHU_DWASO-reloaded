@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
-import { auth } from "@/auth";
 import { confirmInventory, releaseInventory } from "@/lib/inventory";
 import { FieldValue } from "firebase-admin/firestore";
-import { FORCE_PREMIUM } from "@/lib/constants/admin";
+import { verifyAdmin, logAdminAction } from "@/lib/auth/adminGuard";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    const isDev = process.env.NODE_ENV === "development";
-    const isAuthorized = session?.user?.role === "admin" || (FORCE_PREMIUM && isDev);
-
-    if (!isAuthorized) {
+    const admin = await verifyAdmin();
+    if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -85,7 +81,7 @@ export async function POST(request: NextRequest) {
       const logPayload = {
         event: "payment_reconciled",
         message: "Payment manually verified and marked successful via admin reconciliation",
-        actor: session?.user?.email || "admin",
+        actor: admin.email,
         level: "info",
       };
 
@@ -102,7 +98,7 @@ export async function POST(request: NextRequest) {
         const logPayload = {
           event: "payment_reconciled",
           message: `Payment manually verified as ${pStatus} via admin reconciliation`,
-          actor: session?.user?.email || "admin",
+          actor: admin.email,
           level: "error",
         };
         await releaseInventory(orderDoc.ref, logPayload);

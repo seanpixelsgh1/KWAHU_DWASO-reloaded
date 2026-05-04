@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { adminDb } from "@/lib/firebase/admin";
-import { FORCE_PREMIUM } from "@/lib/constants/admin";
+import { verifyAdmin } from "@/lib/auth/adminGuard";
 import {
   getDashboardMetrics,
   getSalesOverTime,
@@ -11,14 +9,8 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    const isDev = process.env.NODE_ENV === "development";
-
-    const isAuthorized = 
-      session?.user?.role === "admin" || 
-      (FORCE_PREMIUM && isDev);
-
-    if (!isAuthorized) {
+    const admin = await verifyAdmin();
+    if (!admin) {
       return NextResponse.json({ error: "Forbidden - Admin access required" }, { status: 403 });
     }
 

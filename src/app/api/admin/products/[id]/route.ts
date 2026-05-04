@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { auth } from "@/auth";
-import { FORCE_PREMIUM } from "@/lib/constants/admin";
+import { verifyAdmin } from "@/lib/auth/adminGuard";
 
 async function isAuthorized() {
-  const session = await auth();
-  const isDev = process.env.NODE_ENV === "development";
-  return session?.user?.role === "admin" || (FORCE_PREMIUM && isDev);
+  const admin = await verifyAdmin();
+  return !!admin;
 }
 
 export async function GET(

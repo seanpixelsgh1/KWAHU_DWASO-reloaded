@@ -1,22 +1,12 @@
 import { NextResponse } from "next/server";
-import { FORCE_PREMIUM } from "@/lib/constants/admin";
 import { adminDb as db } from "@/lib/firebase/admin"; 
 import { FieldValue } from "firebase-admin/firestore";
-import { auth } from "@/auth";
-
-const ADMIN_EMAIL = "seanpixelsgh1@gmail.com";
+import { verifyAdmin } from "@/lib/auth/adminGuard";
 
 export async function POST(request: Request) {
-  const session = await auth();
-  const isDev = process.env.NODE_ENV === "development";
+  const admin = await verifyAdmin();
 
-  // 1. HARDENED SECURITY GATE
-  // Only allow if: It's YOU (via session) OR (Force Premium is on AND we are in Dev mode)
-  const isAuthorized = 
-    session?.user?.email?.toLowerCase() === ADMIN_EMAIL || 
-    (FORCE_PREMIUM && isDev);
-
-  if (!isAuthorized) {
+  if (!admin) {
     return NextResponse.json({ error: "Unauthorized access denied." }, { status: 403 });
   }
 

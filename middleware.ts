@@ -44,6 +44,15 @@ export async function middleware(request: any) {
     return NextResponse.next();
   }
 
+  // GLOBAL DISABLED USER BLOCK
+  if (session && (session as any).isBlocked) {
+    // Prevent redirect loop if already on account-disabled page
+    if (!pathname.startsWith("/account-disabled")) {
+      return NextResponse.redirect(new URL("/account-disabled", request.url));
+    }
+    return NextResponse.next();
+  }
+
   // Restrict protected routes to logged-in users
   if (protectedRoutes.some((route) => pathname.startsWith(route))) {
     if (!session?.user) {

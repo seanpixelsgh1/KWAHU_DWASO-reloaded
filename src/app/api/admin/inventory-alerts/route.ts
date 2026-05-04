@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { verifyAdmin } from "@/lib/auth/adminGuard";
 import { getLowStockProducts, getOutOfStockProducts } from "@/lib/inventoryAlerts";
-import { FORCE_PREMIUM } from "@/lib/constants/admin";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    const isDev = process.env.NODE_ENV === "development";
-
-    const isAuthorized = 
-      session?.user?.role === "admin" || 
-      (FORCE_PREMIUM && isDev);
-
-    if (!isAuthorized) {
+    const admin = await verifyAdmin();
+    if (!admin) {
       return NextResponse.json({ error: "Forbidden - Admin access required" }, { status: 403 });
     }
 

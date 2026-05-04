@@ -1,23 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { auth } from "@/auth";
-import { FORCE_PREMIUM } from "@/lib/constants/admin";
+import { verifyAdmin } from "@/lib/auth/adminGuard";
 import { confirmInventory } from "@/lib/inventory";
 import { withTimeout } from "@/lib/utils/withTimeout";
 
 export async function PUT(request: NextRequest) {
   try {
     // ── 1. AUTHENTICATION & ROLE VALIDATION ──
-    const session = await auth();
-    const isDev = process.env.NODE_ENV === "development";
-    const isAuthorized = session?.user?.role === "admin" || (FORCE_PREMIUM && isDev);
-
-    const adminId = session?.user?.email || session?.user?.id;
-    if (!isAuthorized || !adminId) {
+    const admin = await verifyAdmin();
+    if (!admin) {
       return NextResponse.json(
         { success: false, error: "Forbidden — Administrator access required" },
         { status: 403 }
+      );
+    }
+    const adminId = admin.email;
       );
     }
 

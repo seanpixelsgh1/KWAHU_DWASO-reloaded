@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { auth } from "@/auth";
-import { FORCE_PREMIUM } from "@/lib/constants/admin";
+import { verifyAdmin } from "@/lib/auth/adminGuard";
 
 export async function POST(request: NextRequest) {
   try {
     // 1. HARDENED ADMIN AUTHORIZATION
-    const session = await auth();
-    const isDev = process.env.NODE_ENV === "development";
-    
-    // Check if user is admin OR if in dev mode with FORCE_PREMIUM
-    const isAuthorized = 
-      session?.user?.role === "admin" || 
-      (FORCE_PREMIUM && isDev);
-
-    if (!isAuthorized) {
+    const admin = await verifyAdmin();
+    if (!admin) {
       return NextResponse.json(
         { error: "Forbidden - Administrator access required" },
         { status: 403 }
@@ -130,14 +122,8 @@ export async function POST(request: NextRequest) {
 // GET method for admin to list products
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    const isDev = process.env.NODE_ENV === "development";
-    
-    const isAuthorized = 
-      session?.user?.role === "admin" || 
-      (FORCE_PREMIUM && isDev);
-
-    if (!isAuthorized) {
+    const admin = await verifyAdmin();
+    if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb as db } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { auth } from "@/auth";
-import { FORCE_PREMIUM } from "@/lib/constants/admin";
+import { verifyAdmin } from "@/lib/auth/adminGuard";
 
 /**
  * POST /api/admin/payments/backfill
@@ -14,11 +13,8 @@ import { FORCE_PREMIUM } from "@/lib/constants/admin";
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    const isDev = process.env.NODE_ENV === "development";
-    const isAuthorized = session?.user?.role === "admin" || (FORCE_PREMIUM && isDev);
-
-    if (!isAuthorized) {
+    const admin = await verifyAdmin();
+    if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

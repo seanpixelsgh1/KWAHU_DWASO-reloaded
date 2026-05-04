@@ -1,27 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminStorage } from "@/lib/firebase/admin";
-import { auth } from "@/auth";
-import { FORCE_PREMIUM } from "@/lib/constants/admin";
+import { verifyAdmin } from "@/lib/auth/adminGuard";
 
 export async function POST(request: NextRequest) {
   try {
     // 1. HARDENED ADMIN AUTHORIZATION
-    const session = await auth();
-    const isDev = process.env.NODE_ENV === "development";
-    
-    // Strict Role Check - Require Admin OR God Mode Dev
-    const isAuthorized = 
-      session?.user?.role === "admin" || 
-      (FORCE_PREMIUM && isDev);
+    const admin = await verifyAdmin();
 
-    if (!isAuthorized) {
+    if (!admin) {
       return NextResponse.json(
         { error: "Forbidden - Administrator access required" },
         { status: 403 }
       );
     }
 
-    const userId = session?.user?.id || "admin";
+    const userId = admin.userId || "admin";
 
     // 2. EXTRACT AND VALIDATE FILE
     const formData = await request.formData();
