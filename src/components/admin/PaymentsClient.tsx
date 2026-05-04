@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import PriceFormat from "../PriceFormat";
-import { FiRefreshCw, FiSearch, FiFilter, FiCheckCircle, FiXCircle, FiClock, FiMinusCircle } from "react-icons/fi";
+import { FiRefreshCw, FiSearch, FiFilter, FiCheckCircle, FiXCircle, FiClock, FiMinusCircle, FiDatabase } from "react-icons/fi";
 import { toast } from "react-hot-toast";
 
 interface Payment {
@@ -97,6 +97,22 @@ export default function PaymentsClient() {
     );
   });
 
+  const handleBackfill = async () => {
+    const toastId = toast.loading("Syncing legacy orders to payments...");
+    try {
+      const res = await fetch("/api/admin/payments/backfill", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Backfill complete!", { id: toastId });
+        fetchPayments();
+      } else {
+        toast.error(data.error || "Backfill failed", { id: toastId });
+      }
+    } catch (err) {
+      toast.error("An error occurred during backfill", { id: toastId });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Filters and Search */}
@@ -113,6 +129,12 @@ export default function PaymentsClient() {
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={handleBackfill}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-700 text-xs font-semibold rounded-lg hover:bg-amber-100 transition-colors border border-amber-200 whitespace-nowrap"
+          >
+            <FiDatabase /> Sync Legacy Orders
+          </button>
           <div className="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap">
             <FiFilter /> Filter:
           </div>
@@ -154,8 +176,14 @@ export default function PaymentsClient() {
                 </tr>
               ) : filteredPayments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                    No payments found matching your criteria.
+                  <td colSpan={5} className="px-6 py-12 text-center">
+                    <div className="text-gray-500 mb-3">No payments found matching your criteria.</div>
+                    <button
+                      onClick={handleBackfill}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+                    >
+                      <FiDatabase /> Sync Legacy Orders
+                    </button>
                   </td>
                 </tr>
               ) : (
