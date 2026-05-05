@@ -16,9 +16,6 @@ export async function PUT(request: NextRequest) {
       );
     }
     const adminId = admin.email;
-      );
-    }
-
     // ── 2. INPUT VALIDATION ──
     const body = await request.json().catch(() => ({}));
     const { orderId } = body;
