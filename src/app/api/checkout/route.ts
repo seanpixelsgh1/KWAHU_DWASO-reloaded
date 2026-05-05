@@ -3,6 +3,7 @@ import { adminDb as db } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { auth } from "@/auth";
 import { releaseInventory } from "@/lib/inventory";
+import { getSettings } from "@/lib/settings";
 
 export const POST = async (request: NextRequest) => {
   try {
@@ -15,6 +16,8 @@ export const POST = async (request: NextRequest) => {
     if (!email) {
       return NextResponse.json({ error: "Email is required for checkout" }, { status: 400 });
     }
+
+    const settings = await getSettings();
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
@@ -94,7 +97,7 @@ export const POST = async (request: NextRequest) => {
         customerEmail: email,
         amount: total,
         total: total,
-        currency: "GHS",
+        currency: settings.currency,
         items: items || [],
         status: "pending",
         paymentStatus: "pending",
@@ -103,7 +106,7 @@ export const POST = async (request: NextRequest) => {
         ...(idempotencyKey ? { idempotencyKey } : {}),
         metadata: {
           source: "web",
-          currency: "GHS",
+          currency: settings.currency,
         },
         paymentMethod: "card",
         shippingAddress: shippingAddress || null,
@@ -139,7 +142,7 @@ export const POST = async (request: NextRequest) => {
         orderId: finalOrderId,
         userId: userId || null,
         amount: Math.round(total), // in pesewas
-        currency: "GHS",
+        currency: settings.currency,
         status: "pending",
         paymentMethod: "unknown",
         paystackReference: paymentReference,

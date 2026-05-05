@@ -65,13 +65,35 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>("GHS");
   const [exchangeRates, setExchangeRates] =
     useState<Record<CurrencyCode, number>>(mockExchangeRates);
+  const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>("GHS");
 
-  // Load saved currency from localStorage
+  // Load saved currency from localStorage and fetch default from settings
   useEffect(() => {
+    const fetchGlobalSettings = async () => {
+      try {
+        const res = await fetch("/api/settings");
+        const data = await res.json();
+        if (data.success && data.settings?.currency) {
+          const defaultCurrency = data.settings.currency as CurrencyCode;
+          setBaseCurrency(defaultCurrency);
+          
+          // Only set if user hasn't explicitly chosen one
+          const savedCurrency = localStorage.getItem("selectedCurrency");
+          if (!savedCurrency && currencyData[defaultCurrency]) {
+            setSelectedCurrency(defaultCurrency);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load global currency setting", err);
+      }
+    };
+
     const savedCurrency = localStorage.getItem("selectedCurrency");
     if (savedCurrency && currencyData[savedCurrency as CurrencyCode]) {
       setSelectedCurrency(savedCurrency as CurrencyCode);
     }
+
+    fetchGlobalSettings();
   }, []);
 
   const setCurrency = (currency: CurrencyCode) => {
@@ -81,12 +103,13 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const convertPrice = (
     amount: number,
-    fromCurrency: CurrencyCode = "GHS"
+    fromCurrency?: CurrencyCode
   ): number => {
-    if (fromCurrency === selectedCurrency) return amount;
+    const sourceCurrency = fromCurrency || baseCurrency;
+    if (sourceCurrency === selectedCurrency) return amount;
 
     // Convert from source currency to USD first, then to target currency
-    const usdAmount = amount / exchangeRates[fromCurrency];
+    const usdAmount = amount / exchangeRates[sourceCurrency];
     const convertedAmount = usdAmount * exchangeRates[selectedCurrency];
 
     return convertedAmount;

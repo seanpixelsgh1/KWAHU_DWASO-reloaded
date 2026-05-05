@@ -1,4 +1,5 @@
 import { adminDb as db } from "@/lib/firebase/admin";
+import { getSettings } from "@/lib/settings";
 
 export interface AlertProduct {
   id: string;
@@ -16,13 +17,15 @@ export async function getLowStockProducts(): Promise<AlertProduct[]> {
     .get();
 
   const lowStock: AlertProduct[] = [];
+  const settings = await getSettings();
+  const globalThreshold = settings.inventory.lowStockThreshold;
 
   snapshot.docs.forEach((doc) => {
     const data = doc.data();
     const stock = Number(data.stock || 0);
     const reserved = Number(data.reserved || 0);
     const available = stock - reserved;
-    const threshold = Number(data.lowStockThreshold || 5);
+    const threshold = Number(data.lowStockThreshold ?? globalThreshold);
 
     if (available <= threshold && available > 0) {
       lowStock.push({
@@ -47,12 +50,15 @@ export async function getOutOfStockProducts(): Promise<AlertProduct[]> {
 
   const outOfStock: AlertProduct[] = [];
 
+  const settings = await getSettings();
+  const globalThreshold = settings.inventory.lowStockThreshold;
+
   snapshot.docs.forEach((doc) => {
     const data = doc.data();
     const stock = Number(data.stock || 0);
     const reserved = Number(data.reserved || 0);
     const available = stock - reserved;
-    const threshold = Number(data.lowStockThreshold || 5);
+    const threshold = Number(data.lowStockThreshold ?? globalThreshold);
 
     if (available <= 0) {
       outOfStock.push({
@@ -70,11 +76,13 @@ export async function getOutOfStockProducts(): Promise<AlertProduct[]> {
   return outOfStock;
 }
 
-export function getInventoryStatus(product: { stock?: number; reserved?: number; lowStockThreshold?: number }) {
+export async function getInventoryStatus(product: { stock?: number; reserved?: number; lowStockThreshold?: number }) {
   const stock = Number(product.stock || 0);
   const reserved = Number(product.reserved || 0);
   const available = stock - reserved;
-  const threshold = Number(product.lowStockThreshold || 5);
+  
+  const settings = await getSettings();
+  const threshold = Number(product.lowStockThreshold ?? settings.inventory.lowStockThreshold);
 
   if (available <= 0) return "out";
   if (available <= threshold) return "low";
