@@ -7,8 +7,9 @@ import { getAllProducts } from "@/lib/products";
 import {
   getBestSellers,
   getNewArrivals,
-  getOffers,
 } from "./helpers/productHelpers";
+
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const allProducts = await getAllProducts();

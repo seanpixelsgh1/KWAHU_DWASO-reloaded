@@ -13,6 +13,8 @@ import ProductSpecifications from "@/components/ProductSpecifications";
 import RelatedProducts from "@/components/RelatedProducts";
 import { notFound } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 interface Props {
   params: Promise<{
     id: string;

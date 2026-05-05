@@ -4,6 +4,8 @@ import { getCategories, getAllProducts } from "@/lib/products";
 import { Metadata } from "next";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Product Categories | Kwahu Dwaso - Shop by Category",
   description:

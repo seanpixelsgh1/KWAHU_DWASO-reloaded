@@ -11,6 +11,8 @@ import {
 } from "../helpers/productHelpers";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 interface Props {
   searchParams: Promise<{
     category?: string;

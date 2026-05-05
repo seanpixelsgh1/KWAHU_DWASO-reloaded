@@ -5,6 +5,8 @@ import OffersList from "@/components/pages/offers/OffersList";
 import Link from "next/link";
 import { getAllProducts } from "@/lib/products";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Special Offers - Kwahu Dwaso",
   description:
