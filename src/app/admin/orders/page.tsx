@@ -35,7 +35,7 @@ async function OrdersDataFetcher() {
 
       let status = "pending";
       const rawStatus = data.status?.toLowerCase();
-      if (["processing", "delivered"].includes(rawStatus)) {
+      if (["processing", "packed", "out_for_delivery", "delivered"].includes(rawStatus)) {
         status = rawStatus;
       } else if (rawStatus === "completed") {
         status = "delivered";

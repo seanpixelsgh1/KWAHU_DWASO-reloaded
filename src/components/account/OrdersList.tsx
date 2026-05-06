@@ -98,6 +98,7 @@ export default function OrdersList({
     switch (status.toLowerCase()) {
       case "confirmed":
       case "completed":
+      case "delivered":
         return "bg-green-100 text-green-800";
       case "pending":
         return "bg-yellow-100 text-yellow-800";
@@ -105,9 +106,29 @@ export default function OrdersList({
         return "bg-red-100 text-red-800";
       case "processing":
         return "bg-blue-100 text-blue-800";
+      case "packed":
+        return "bg-indigo-100 text-indigo-800";
+      case "out_for_delivery":
+        return "bg-purple-100 text-purple-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
+  };
+
+  const formatStatus = (status: string) => status.replace(/_/g, " ");
+
+  // Tracking timeline steps
+  const TRACKING_STEPS = [
+    { key: "paid", label: "Payment Confirmed", icon: "✅" },
+    { key: "processing", label: "Processing", icon: "⚙️" },
+    { key: "packed", label: "Packed", icon: "📦" },
+    { key: "out_for_delivery", label: "Out for Delivery", icon: "🚚" },
+    { key: "delivered", label: "Delivered", icon: "🎉" },
+  ];
+
+  const getStepIndex = (status: string) => {
+    const idx = TRACKING_STEPS.findIndex((s) => s.key === status);
+    return idx >= 0 ? idx : 0;
   };
 
   const openOrderModal = (order: Order) => {
@@ -236,6 +257,41 @@ export default function OrdersList({
               </div>
             </div>
 
+            {/* Tracking Timeline */}
+            {selectedOrder.paymentStatus.toLowerCase() === "paid" && (
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Order Tracking</h4>
+                <div className="flex items-center justify-between">
+                  {TRACKING_STEPS.map((step, idx) => {
+                    const currentIdx = getStepIndex(selectedOrder.status.toLowerCase());
+                    const isCompleted = idx <= currentIdx;
+                    const isCurrent = idx === currentIdx;
+                    return (
+                      <div key={step.key} className="flex flex-col items-center flex-1 relative">
+                        {idx > 0 && (
+                          <div className={`absolute top-4 right-1/2 w-full h-0.5 -z-10 ${
+                            idx <= currentIdx ? "bg-green-400" : "bg-gray-200"
+                          }`} />
+                        )}
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm z-10 ${
+                          isCompleted
+                            ? "bg-green-100 border-2 border-green-500"
+                            : "bg-gray-100 border-2 border-gray-300"
+                        } ${isCurrent ? "ring-2 ring-green-300 ring-offset-2" : ""}`}>
+                          {step.icon}
+                        </div>
+                        <span className={`text-xs mt-1 text-center ${
+                          isCompleted ? "text-green-700 font-medium" : "text-gray-400"
+                        }`}>
+                          {step.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Order Items */}
             <div>
               <h4 className="text-lg font-semibold text-gray-900 mb-4">
@@ -293,8 +349,8 @@ export default function OrdersList({
               >
                 Close
               </button>
-              {selectedOrder.status.toLowerCase() === "confirmed" &&
-                selectedOrder.paymentStatus.toLowerCase() === "paid" && (
+              {selectedOrder.paymentStatus.toLowerCase() === "paid" &&
+                ["processing", "packed", "out_for_delivery", "delivered"].includes(selectedOrder.status.toLowerCase()) && (
                   <Link
                     href={`/account/orders/${selectedOrder.id}`}
                     className="px-4 py-2 text-sm font-medium text-white bg-theme-color rounded-md hover:bg-theme-color/90 transition-colors"
@@ -543,8 +599,8 @@ export default function OrdersList({
                       >
                         <FiEye className="w-3 h-3" />
                       </button>
-                      {order.status.toLowerCase() === "confirmed" &&
-                        order.paymentStatus.toLowerCase() === "paid" && (
+                      {order.paymentStatus.toLowerCase() === "paid" &&
+                        ["processing", "packed", "out_for_delivery", "delivered"].includes(order.status.toLowerCase()) && (
                           <Link
                             href={`/account/orders/${order.id}`}
                             className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 transition-colors"
@@ -655,8 +711,8 @@ export default function OrdersList({
                   <FiEye className="w-3 h-3 mr-1" />
                   View
                 </button>
-                {order.status.toLowerCase() === "confirmed" &&
-                  order.paymentStatus.toLowerCase() === "paid" && (
+                {order.paymentStatus.toLowerCase() === "paid" &&
+                  ["processing", "packed", "out_for_delivery", "delivered"].includes(order.status.toLowerCase()) && (
                     <Link
                       href={`/account/orders/${order.id}`}
                       className="flex items-center justify-center px-3 py-1 text-xs bg-theme-color text-white rounded hover:bg-theme-color/90 transition-colors whitespace-nowrap"

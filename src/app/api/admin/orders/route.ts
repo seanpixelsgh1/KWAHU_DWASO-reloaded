@@ -63,10 +63,10 @@ export async function GET(request: NextRequest) {
         paymentStatus = "paid"; // Map legacy "success" to "paid"
       }
 
-      // Normalize status ("pending" | "processing" | "delivered")
+      // Normalize status ("pending" | "processing" | "packed" | "out_for_delivery" | "delivered")
       let status = "pending";
       const rawStatus = data.status?.toLowerCase();
-      if (["processing", "delivered"].includes(rawStatus)) {
+      if (["processing", "packed", "out_for_delivery", "delivered"].includes(rawStatus)) {
         status = rawStatus;
       } else if (rawStatus === "completed") {
         status = "delivered"; // Map legacy "completed" to "delivered"
