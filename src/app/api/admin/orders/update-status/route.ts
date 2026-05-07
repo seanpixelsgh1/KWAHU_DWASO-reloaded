@@ -5,17 +5,19 @@ import { verifyAdmin } from "@/lib/auth/adminGuard";
 
 const allowedTransitions: Record<string, string[]> = {
   pending: ["processing", "cancelled"],
-  processing: ["delivered", "cancelled"],
+  processing: ["packed", "cancelled"],
+  packed: ["out_for_delivery", "cancelled"],
+  out_for_delivery: ["delivered", "cancelled"],
   delivered: [],
   cancelled: [],
 };
 
 // Transitions that require payment to be verified
-const requiresPayment = new Set(["processing", "delivered"]);
+const requiresPayment = new Set(["processing", "packed", "out_for_delivery", "delivered"]);
 
 function normalizeStatus(raw: string | undefined): string {
   const s = raw?.toLowerCase();
-  if (["pending", "processing", "delivered", "cancelled"].includes(s || "")) return s!;
+  if (["pending", "processing", "packed", "out_for_delivery", "delivered", "cancelled"].includes(s || "")) return s!;
   if (s === "completed") return "delivered";
   return "pending";
 }
@@ -117,7 +119,7 @@ export async function PUT(request: NextRequest) {
         meta: {
           previousStatus: currentStatus,
           newStatus: newStatus,
-          initiatedBy: session?.user?.email || "admin",
+          initiatedBy: admin.email || "admin",
         },
       });
 
@@ -197,7 +199,11 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     console.error("API ERROR [admin-orders-update-status]:", error);
     return NextResponse.json(
-      { success: false, error: "Internal Server Error" },
+      {
+        success: false,
+        error: "Internal Server Error",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }

@@ -100,8 +100,12 @@ export default function OrderDetails({ order }: { order: OrderType }) {
   const [copiedRef, setCopiedRef] = useState(false);
   const [expandedLogs, setExpandedLogs] = useState<Record<string, boolean>>({});
   const [showRawPayment, setShowRawPayment] = useState(false);
+  const [fulfilling, setFulfilling] = useState(false);
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [riderName, setRiderName] = useState("");
+  const [riderPhone, setRiderPhone] = useState("");
 
-  const isUpdating = loadingAction !== null;
+  const isUpdating = loadingAction !== null || fulfilling;
 
   const handleCopyRef = () => {
     if (order.paymentReference) {
@@ -146,6 +150,42 @@ export default function OrderDetails({ order }: { order: OrderType }) {
     } finally {
       setLoadingAction(null);
     }
+  };
+
+  const handleFulfill = async (nextStatus: string, rider?: { name: string; phone: string }) => {
+    setFulfilling(true);
+    setErrorMsg(null);
+
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}/fulfill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nextStatus, rider }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(`Order marked as ${nextStatus.replace(/_/g, " ")}`);
+        router.refresh();
+      } else {
+        throw new Error(data.error || "Transition failed");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || "Failed to fulfill order");
+      toast.error(err.message || "Failed to fulfill order");
+    } finally {
+      setFulfilling(false);
+    }
+  };
+
+  const handleDispatchSubmit = () => {
+    if (!riderName.trim() || !riderPhone.trim()) return;
+    handleFulfill("out_for_delivery", { name: riderName.trim(), phone: riderPhone.trim() });
+    setShowDispatchModal(false);
+    setRiderName("");
+    setRiderPhone("");
   };
 
   const verifyPayment = async () => {
@@ -439,20 +479,40 @@ export default function OrderDetails({ order }: { order: OrderType }) {
           <div className="bg-white rounded-2xl border shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Operational Controls</h2>
             <div className="space-y-3">
-              <button
-                onClick={() => updateStatus("processing")}
-                disabled={isUpdating || order.status === "processing" || order.status === "cancelled" || order.status === "delivered"}
-                className="w-full flex justify-center items-center py-2 px-4 border border-blue-600 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loadingAction === "status_processing" ? "Processing..." : "Mark as Processing"}
-              </button>
-              <button
-                onClick={() => updateStatus("delivered")}
-                disabled={isUpdating || order.status === "delivered" || order.status === "cancelled" || order.status === "pending"}
-                className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loadingAction === "status_delivered" ? "Processing..." : "Mark as Delivered"}
-              </button>
+              {order.paymentStatus === "paid" && order.status === "processing" && (
+                <button
+                  onClick={() => handleFulfill("packed")}
+                  disabled={isUpdating}
+                  className="w-full flex justify-center items-center py-2 px-4 border border-blue-600 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {fulfilling ? "Updating..." : "📦 Mark as Packed"}
+                </button>
+              )}
+              {order.paymentStatus === "paid" && order.status === "packed" && (
+                <button
+                  onClick={() => setShowDispatchModal(true)}
+                  disabled={isUpdating}
+                  className="w-full flex justify-center items-center py-2 px-4 border border-purple-600 rounded-lg text-sm font-medium text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {fulfilling ? "Updating..." : "🚚 Dispatch"}
+                </button>
+              )}
+              {order.paymentStatus === "paid" && order.status === "out_for_delivery" && (
+                <button
+                  onClick={() => handleFulfill("delivered")}
+                  disabled={isUpdating}
+                  className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {fulfilling ? "Updating..." : "✅ Mark as Delivered"}
+                </button>
+              )}
+              
+              {/* Legacy fallback if order gets stuck in processing without being paid, though shouldn't happen */}
+              {order.paymentStatus !== "paid" && order.status === "pending" && (
+                 <p className="text-sm text-gray-500 italic text-center py-2 border rounded-lg bg-gray-50">
+                    Awaiting Payment Verification
+                 </p>
+              )}
             </div>
             
             <div className="mt-6 pt-6 border-t border-red-100">
@@ -537,6 +597,61 @@ export default function OrderDetails({ order }: { order: OrderType }) {
 
         </div>
       </div>
+
+      {/* Dispatch Modal */}
+      {showDispatchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowDispatchModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6 z-10">
+            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-purple-100 rounded-full">
+              <span className="text-2xl">🚚</span>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 text-center mb-2">Dispatch Order</h3>
+            <p className="text-sm text-gray-500 text-center mb-6">
+              Assign a rider to deliver order #{order.id.slice(0, 8)}
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Rider Name *</label>
+                <input
+                  type="text"
+                  value={riderName}
+                  onChange={(e) => setRiderName(e.target.value)}
+                  placeholder="e.g. Kofi Mensah"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Rider Phone *</label>
+                <input
+                  type="tel"
+                  value={riderPhone}
+                  onChange={(e) => setRiderPhone(e.target.value)}
+                  placeholder="e.g. 024XXXXXXX"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => { setShowDispatchModal(false); setRiderName(""); setRiderPhone(""); }}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDispatchSubmit}
+                disabled={!riderName.trim() || !riderPhone.trim() || fulfilling}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {fulfilling ? "Dispatching..." : "🚚 Dispatch Now"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
