@@ -51,6 +51,8 @@ const getNextAction = (order: Order): { label: string; nextStatus: string; color
   if (order.paymentStatus !== "paid") return null;
 
   switch (order.status) {
+    case "pending":
+      return { label: "Mark as Processing", nextStatus: "processing", color: "text-blue-700 hover:bg-blue-50", icon: "⚙️" };
     case "processing":
       return { label: "Mark as Packed", nextStatus: "packed", color: "text-blue-700 hover:bg-blue-50", icon: "📦" };
     case "packed":

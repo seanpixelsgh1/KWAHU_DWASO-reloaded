@@ -8,6 +8,7 @@ import { sendOrderUpdate } from "@/lib/notifications/orderNotifications";
 // STRICT ORDER STATE MACHINE
 // ─────────────────────────────────────────────
 const ORDER_FLOW: Record<string, string[]> = {
+  pending: ["processing"],
   processing: ["packed"],
   packed: ["out_for_delivery"],
   out_for_delivery: ["delivered"],
@@ -15,6 +16,7 @@ const ORDER_FLOW: Record<string, string[]> = {
 };
 
 const EVENT_MAP: Record<string, { event: string; message: string }> = {
+  processing: { event: "order_processing", message: "Order marked as processing" },
   packed: { event: "order_packed", message: "Order packed and ready for dispatch" },
   out_for_delivery: { event: "order_dispatched", message: "Order handed to rider for delivery" },
   delivered: { event: "order_delivered", message: "Order delivered successfully" },
@@ -46,7 +48,7 @@ export async function POST(
       );
     }
 
-    const validStatuses = ["packed", "out_for_delivery", "delivered"];
+    const validStatuses = ["processing", "packed", "out_for_delivery", "delivered"];
     if (!validStatuses.includes(nextStatus)) {
       return NextResponse.json(
         { error: `Invalid status: '${nextStatus}'. Must be one of: ${validStatuses.join(", ")}` },

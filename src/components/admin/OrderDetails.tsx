@@ -479,6 +479,15 @@ export default function OrderDetails({ order }: { order: OrderType }) {
           <div className="bg-white rounded-2xl border shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Operational Controls</h2>
             <div className="space-y-3">
+              {order.paymentStatus === "paid" && order.status === "pending" && (
+                <button
+                  onClick={() => handleFulfill("processing")}
+                  disabled={isUpdating}
+                  className="w-full flex justify-center items-center py-2 px-4 border border-blue-600 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {fulfilling ? "Updating..." : "⚙️ Mark as Processing"}
+                </button>
+              )}
               {order.paymentStatus === "paid" && order.status === "processing" && (
                 <button
                   onClick={() => handleFulfill("packed")}
@@ -507,12 +516,7 @@ export default function OrderDetails({ order }: { order: OrderType }) {
                 </button>
               )}
               
-              {/* Legacy fallback if order gets stuck in processing without being paid, though shouldn't happen */}
-              {order.paymentStatus !== "paid" && order.status === "pending" && (
-                 <p className="text-sm text-gray-500 italic text-center py-2 border rounded-lg bg-gray-50">
-                    Awaiting Payment Verification
-                 </p>
-              )}
+
             </div>
             
             <div className="mt-6 pt-6 border-t border-red-100">
